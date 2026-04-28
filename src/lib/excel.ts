@@ -1,12 +1,17 @@
 import * as XLSX from "xlsx";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
-export interface ParsedUpload {
+export interface ParsedPeriod {
   periodKey: string;
   periodLabel: string;
   year: number;
   month: number;
   rows: Omit<TablesInsert<"transactions">, "period_id">[];
+}
+
+export interface ParsedUpload {
+  periods: ParsedPeriod[];
+  totalRows: number;
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -15,7 +20,6 @@ function parseDate(v: unknown): Date | null {
   if (!v) return null;
   if (v instanceof Date) return v;
   if (typeof v === "number") {
-    // Excel serial
     const d = XLSX.SSF.parse_date_code(v);
     if (d) return new Date(d.y, d.m - 1, d.d);
   }
@@ -63,23 +67,30 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
         total:          Number(grab(r, "Total", "Total ", "Amount") ?? 0) || 0,
       };
     })
-    .filter((r) => r.client_name);
+    .filter((r) => r.client_name && r.txn_date);
 
-  // Auto-detect period: most common month
-  const counts = new Map<string, number>();
+  if (!rows.length) throw new Error("No valid dated rows found in the spreadsheet.");
+
+  // Group rows by their actual transaction month (YYYY-MM)
+  const groups = new Map<string, typeof rows>();
   for (const r of rows) {
-    if (!r.txn_date) continue;
-    const k = r.txn_date.slice(0, 7);
-    counts.set(k, (counts.get(k) || 0) + 1);
+    const k = r.txn_date!.slice(0, 7);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push(r);
   }
-  if (!counts.size) throw new Error("No valid dates found in the spreadsheet.");
-  const periodKey = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-  const [yStr, mStr] = periodKey.split("-");
-  const year = Number(yStr);
-  const month = Number(mStr);
-  return {
-    periodKey, year, month,
-    periodLabel: `${MONTHS[month - 1]} ${year}`,
-    rows,
-  };
+
+  const periods: ParsedPeriod[] = [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([periodKey, prows]) => {
+      const [yStr, mStr] = periodKey.split("-");
+      const year = Number(yStr);
+      const month = Number(mStr);
+      return {
+        periodKey, year, month,
+        periodLabel: `${MONTHS[month - 1]} ${year}`,
+        rows: prows,
+      };
+    });
+
+  return { periods, totalRows: rows.length };
 }

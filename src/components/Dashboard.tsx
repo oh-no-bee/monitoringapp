@@ -33,6 +33,7 @@ export function Dashboard() {
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState("ALL");
   const [alertFilter, setAlertFilter] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: periods = [] } = useQuery({
@@ -84,33 +85,36 @@ export function Dashboard() {
   const upload = useMutation({
     mutationFn: async (file: File) => {
       const parsed = await parseExcel(file);
-      // upsert period
-      const { data: existing } = await supabase.from("upload_periods").select("id").eq("period_key", parsed.periodKey).maybeSingle();
-      let periodId = existing?.id;
-      if (periodId) {
-        await supabase.from("transactions").delete().eq("period_id", periodId);
-        await supabase.from("upload_periods").update({ uploaded_at: new Date().toISOString(), filename: file.name, row_count: parsed.rows.length }).eq("id", periodId);
-      } else {
-        const { data, error } = await supabase.from("upload_periods").insert({
-          period_key: parsed.periodKey, period_label: parsed.periodLabel,
-          year: parsed.year, month: parsed.month,
-          filename: file.name, row_count: parsed.rows.length,
-        }).select("id").single();
-        if (error) throw error;
-        periodId = data.id;
+      const created: { id: string; label: string; count: number }[] = [];
+      for (const period of parsed.periods) {
+        const { data: existing } = await supabase.from("upload_periods").select("id").eq("period_key", period.periodKey).maybeSingle();
+        let periodId = existing?.id;
+        if (periodId) {
+          await supabase.from("transactions").delete().eq("period_id", periodId);
+          await supabase.from("upload_periods").update({ uploaded_at: new Date().toISOString(), filename: file.name, row_count: period.rows.length }).eq("id", periodId);
+        } else {
+          const { data, error } = await supabase.from("upload_periods").insert({
+            period_key: period.periodKey, period_label: period.periodLabel,
+            year: period.year, month: period.month,
+            filename: file.name, row_count: period.rows.length,
+          }).select("id").single();
+          if (error) throw error;
+          periodId = data.id;
+        }
+        const batch = 500;
+        for (let i = 0; i < period.rows.length; i += batch) {
+          const slice = period.rows.slice(i, i + batch).map((r) => ({ ...r, period_id: periodId! }));
+          const { error } = await supabase.from("transactions").insert(slice);
+          if (error) throw error;
+        }
+        created.push({ id: periodId!, label: period.periodLabel, count: period.rows.length });
       }
-      // batch insert
-      const batch = 500;
-      for (let i = 0; i < parsed.rows.length; i += batch) {
-        const slice = parsed.rows.slice(i, i + batch).map((r) => ({ ...r, period_id: periodId! }));
-        const { error } = await supabase.from("transactions").insert(slice);
-        if (error) throw error;
-      }
-      return { periodId, label: parsed.periodLabel, count: parsed.rows.length };
+      return created;
     },
-    onSuccess: (r) => {
-      toast.success(`Loaded ${r.count.toLocaleString()} transactions for ${r.label}`);
-      setActivePeriod(r.periodId!);
+    onSuccess: (created) => {
+      const summary = created.map((c) => `${c.label} (${c.count.toLocaleString()})`).join(", ");
+      toast.success(`Loaded ${created.length} period${created.length > 1 ? "s" : ""}: ${summary}`);
+      if (created.length) setActivePeriod(created[created.length - 1].id);
       qc.invalidateQueries();
     },
     onError: (e: Error) => toast.error(e.message || "Upload failed"),
@@ -126,8 +130,11 @@ export function Dashboard() {
 
   const results: ClientResult[] = txns.length ? runRules(txns, settings, customs) : [];
 
+  const clientTypes = Array.from(new Set(results.map((r) => r.clientType).filter(Boolean))).sort();
+
   const filtered = results.filter((c) => {
     if (riskFilter !== "ALL" && c.riskLevel !== riskFilter) return false;
+    if (typeFilter !== "ALL" && c.clientType !== typeFilter) return false;
     if (alertFilter === "CTR" && !c.hasCTR) return false;
     if (alertFilter === "SDA" && !c.hasSDA) return false;
     if (alertFilter === "BOTH" && !(c.hasCTR && c.hasSDA)) return false;
@@ -247,6 +254,15 @@ export function Dashboard() {
                     <SelectItem value="CTR">CTR Only</SelectItem>
                     <SelectItem value="SDA">SDA Only</SelectItem>
                     <SelectItem value="BOTH">CTR + SDA</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Client Type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Client Types</SelectItem>
+                    {clientTypes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <div className="flex-1" />

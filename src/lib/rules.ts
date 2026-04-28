@@ -217,18 +217,20 @@ function evaluateCustom(ct: CustomTrigger, txns: Txn[], totalZAR: number): boole
 
 function matchOp(field: unknown, op: string, value: string | number): boolean {
   const n = Number(field);
-  const s = String(field ?? "").toLowerCase();
-  const vs = String(value ?? "").toLowerCase();
+  const s = String(field ?? "").toLowerCase().trim();
+  const vs = String(value ?? "").toLowerCase().trim();
   const vn = Number(value);
+  // Support comma-separated values for categorical operators (e.g. "LI,MCPI")
+  const list = vs.split(",").map((x) => x.trim()).filter(Boolean);
   switch (op) {
     case ">": return n > vn;
     case ">=": return n >= vn;
     case "<": return n < vn;
     case "<=": return n <= vn;
-    case "=": return s === vs;
-    case "!=": return s !== vs;
-    case "contains": return s.includes(vs);
-    case "starts_with": return s.startsWith(vs);
+    case "=": return list.length > 1 ? list.includes(s) : s === vs;
+    case "!=": return list.length > 1 ? !list.includes(s) : s !== vs;
+    case "contains": return list.length > 1 ? list.some((v) => s.includes(v)) : s.includes(vs);
+    case "starts_with": return list.length > 1 ? list.some((v) => s.startsWith(v)) : s.startsWith(vs);
   }
   return false;
 }

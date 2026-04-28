@@ -259,12 +259,20 @@ export function Dashboard() {
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Client Type" /></SelectTrigger>
+                  <SelectTrigger className="w-[170px]"><SelectValue placeholder="Client Type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All Client Types</SelectItem>
                     {clientTypes.map((t) => (
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={dirFilter} onValueChange={setDirFilter}>
+                  <SelectTrigger className="w-[150px]"><SelectValue placeholder="Direction" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Buy & Sell</SelectItem>
+                    <SelectItem value="B">Buy only</SelectItem>
+                    <SelectItem value="S">Sell only</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="flex-1" />

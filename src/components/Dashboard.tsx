@@ -48,6 +48,8 @@ export function Dashboard() {
     },
   });
 
+  const ALL_PERIODS = "__ALL__";
+
   const { data: settings = [] } = useQuery({
     queryKey: ["trigger_settings"],
     queryFn: async () => {
@@ -72,8 +74,11 @@ export function Dashboard() {
     queryFn: async () => {
       const all: Tables<"transactions">[] = [];
       let from = 0; const step = 1000;
+      const isAll = activePeriod === ALL_PERIODS;
       while (true) {
-        const { data, error } = await supabase.from("transactions").select("*").eq("period_id", activePeriod!).range(from, from + step - 1);
+        let q = supabase.from("transactions").select("*").range(from, from + step - 1);
+        if (!isAll) q = q.eq("period_id", activePeriod!);
+        const { data, error } = await q;
         if (error) throw error;
         if (!data?.length) break;
         all.push(...(data as Tables<"transactions">[]));
@@ -158,7 +163,7 @@ export function Dashboard() {
   };
 
   const activePeriodObj = periods.find((p) => p.id === activePeriod);
-  const periodLabel = activePeriodObj?.period_label || "Current";
+  const periodLabel = activePeriod === ALL_PERIODS ? "All Months Combined" : (activePeriodObj?.period_label || "Current");
 
   const toggle = (k: string) => {
     const n = new Set(expanded);
@@ -205,9 +210,14 @@ export function Dashboard() {
                       {p.period_label} <span className="ml-2 text-[10px] opacity-60">{p.row_count}</span>
                     </TabsTrigger>
                   ))}
+                  {periods.length > 1 && (
+                    <TabsTrigger value={ALL_PERIODS} className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+                      All Months <span className="ml-2 text-[10px] opacity-60">{periods.reduce((a, p) => a + (p.row_count || 0), 0)}</span>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </Tabs>
-              {activePeriodObj && (
+              {activePeriodObj && activePeriod !== ALL_PERIODS && (
                 <Button size="sm" variant="ghost" onClick={() => { if (confirm(`Delete ${activePeriodObj.period_label}?`)) deletePeriod.mutate(activePeriodObj.id); }}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>

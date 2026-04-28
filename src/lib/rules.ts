@@ -217,18 +217,20 @@ function evaluateCustom(ct: CustomTrigger, txns: Txn[], totalZAR: number): boole
 
 function matchOp(field: unknown, op: string, value: string | number): boolean {
   const n = Number(field);
-  const s = String(field ?? "").toLowerCase();
-  const vs = String(value ?? "").toLowerCase();
+  const s = String(field ?? "").toLowerCase().trim();
+  const vs = String(value ?? "").toLowerCase().trim();
   const vn = Number(value);
+  // Support comma-separated values for categorical operators (e.g. "LI,MCPI")
+  const list = vs.split(",").map((x) => x.trim()).filter(Boolean);
   switch (op) {
     case ">": return n > vn;
     case ">=": return n >= vn;
     case "<": return n < vn;
     case "<=": return n <= vn;
-    case "=": return s === vs;
-    case "!=": return s !== vs;
-    case "contains": return s.includes(vs);
-    case "starts_with": return s.startsWith(vs);
+    case "=": return list.length > 1 ? list.includes(s) : s === vs;
+    case "!=": return list.length > 1 ? !list.includes(s) : s !== vs;
+    case "contains": return list.length > 1 ? list.some((v) => s.includes(v)) : s.includes(vs);
+    case "starts_with": return list.length > 1 ? list.some((v) => s.startsWith(v)) : s.startsWith(vs);
   }
   return false;
 }
@@ -251,3 +253,44 @@ export const OPS = [
   { value: "=", label: "equals" }, { value: "!=", label: "≠" },
   { value: "contains", label: "contains" }, { value: "starts_with", label: "starts with" },
 ];
+
+// Predefined options per categorical field. Multi-select is encoded as comma-separated string.
+export const FIELD_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  client_type: [
+    { value: "LI", label: "LI — Local Individual" },
+    { value: "LC", label: "LC — Local Corporate" },
+    { value: "LAI", label: "LAI — Local Auth Individual" },
+    { value: "LAC", label: "LAC — Local Auth Corporate" },
+    { value: "MCPI", label: "MCPI — Money Changer Pers. Indiv." },
+    { value: "MCPC", label: "MCPC — Money Changer Pers. Corp." },
+    { value: "FI", label: "FI — Foreign Individual" },
+    { value: "FC", label: "FC — Foreign Corporate" },
+  ],
+  direction: [
+    { value: "BUY", label: "Buy" },
+    { value: "SELL", label: "Sell" },
+  ],
+  product: [
+    { value: "CASH", label: "Cash" },
+    { value: "LOCAL", label: "Local" },
+    { value: "EFT", label: "EFT" },
+    { value: "TT", label: "TT" },
+    { value: "DRAFT", label: "Draft" },
+  ],
+  currency: [
+    { value: "ZAR", label: "ZAR" }, { value: "USD", label: "USD" },
+    { value: "EUR", label: "EUR" }, { value: "GBP", label: "GBP" },
+    { value: "AUD", label: "AUD" }, { value: "CAD", label: "CAD" },
+    { value: "CHF", label: "CHF" }, { value: "JPY", label: "JPY" },
+    { value: "CNY", label: "CNY" }, { value: "AED", label: "AED" },
+  ],
+  sanction_check: [
+    { value: "Yes", label: "Yes" }, { value: "No", label: "No" },
+  ],
+  sanction_match: [
+    { value: "Yes", label: "Yes" }, { value: "No", label: "No" },
+  ],
+};
+
+export const NUMERIC_FIELDS = new Set(["total", "txn_count", "sanction_hits"]);
+

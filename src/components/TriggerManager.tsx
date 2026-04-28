@@ -9,10 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Trash2, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
-import { TXN_FIELDS, OPS } from "@/lib/rules";
+import { TXN_FIELDS, OPS, FIELD_OPTIONS, NUMERIC_FIELDS } from "@/lib/rules";
 
 interface Cond { field: string; op: string; value: string; combine?: "AND" | "OR" }
 
@@ -171,7 +173,12 @@ function CustomRuleEditor({ customs }: { customs: Tables<"custom_triggers">[] })
                     <SelectTrigger className="w-[100px] h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{OPS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                   </Select>
-                  <Input value={c.value} onChange={(e) => setConds(conds.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} placeholder="value" className="h-9 w-32" />
+                  <ValueInput
+                    field={c.field}
+                    value={c.value}
+                    op={c.op}
+                    onChange={(v) => setConds(conds.map((x, j) => j === i ? { ...x, value: v } : x))}
+                  />
                   {conds.length > 1 && (
                     <Button size="sm" variant="ghost" onClick={() => setConds(conds.filter((_, j) => j !== i))}><X className="h-3 w-3" /></Button>
                   )}
@@ -206,5 +213,58 @@ function CustomRuleEditor({ customs }: { customs: Tables<"custom_triggers">[] })
         <p className="text-xs text-center text-muted-foreground py-4">No custom rules yet. Create one to add bespoke screening logic.</p>
       )}
     </div>
+  );
+}
+
+function ValueInput({ field, value, op, onChange }: { field: string; value: string; op: string; onChange: (v: string) => void }) {
+  const options = FIELD_OPTIONS[field];
+  const isNumeric = NUMERIC_FIELDS.has(field);
+  const isCategorical = !!options && (op === "=" || op === "!=" || op === "contains" || op === "starts_with");
+
+  if (isCategorical) {
+    const selected = value.split(",").map((s) => s.trim()).filter(Boolean);
+    const toggle = (v: string) => {
+      const set = new Set(selected);
+      if (set.has(v)) set.delete(v); else set.add(v);
+      onChange(Array.from(set).join(","));
+    };
+    const labelText = selected.length === 0
+      ? "Select…"
+      : selected.length <= 2
+        ? selected.join(", ")
+        : `${selected.length} selected`;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-9 w-44 justify-between font-normal">
+            <span className="truncate">{labelText}</span>
+            <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2" align="start">
+          <div className="max-h-64 overflow-auto space-y-1">
+            {options!.map((o) => (
+              <label key={o.value} className="flex items-center gap-2 text-sm px-2 py-1.5 rounded hover:bg-accent cursor-pointer">
+                <Checkbox checked={selected.includes(o.value)} onCheckedChange={() => toggle(o.value)} />
+                <span className="flex-1">{o.label}</span>
+              </label>
+            ))}
+          </div>
+          {selected.length > 0 && (
+            <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => onChange("")}>Clear</Button>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return (
+    <Input
+      type={isNumeric ? "number" : "text"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="value"
+      className="h-9 w-32"
+    />
   );
 }

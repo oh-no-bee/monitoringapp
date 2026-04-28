@@ -34,6 +34,7 @@ export function Dashboard() {
   const [riskFilter, setRiskFilter] = useState("ALL");
   const [alertFilter, setAlertFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [dirFilter, setDirFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: periods = [] } = useQuery({
@@ -135,6 +136,7 @@ export function Dashboard() {
   const filtered = results.filter((c) => {
     if (riskFilter !== "ALL" && c.riskLevel !== riskFilter) return false;
     if (typeFilter !== "ALL" && c.clientType !== typeFilter) return false;
+    if (dirFilter !== "ALL" && !c.txns.some((t) => (t.direction || "").toUpperCase().startsWith(dirFilter))) return false;
     if (alertFilter === "CTR" && !c.hasCTR) return false;
     if (alertFilter === "SDA" && !c.hasSDA) return false;
     if (alertFilter === "BOTH" && !(c.hasCTR && c.hasSDA)) return false;
@@ -257,12 +259,20 @@ export function Dashboard() {
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Client Type" /></SelectTrigger>
+                  <SelectTrigger className="w-[170px]"><SelectValue placeholder="Client Type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All Client Types</SelectItem>
                     {clientTypes.map((t) => (
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                <Select value={dirFilter} onValueChange={setDirFilter}>
+                  <SelectTrigger className="w-[150px]"><SelectValue placeholder="Direction" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Buy & Sell</SelectItem>
+                    <SelectItem value="B">Buy only</SelectItem>
+                    <SelectItem value="S">Sell only</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="flex-1" />

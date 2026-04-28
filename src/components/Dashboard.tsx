@@ -34,6 +34,7 @@ export function Dashboard() {
   const [riskFilter, setRiskFilter] = useState("ALL");
   const [alertFilter, setAlertFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [dirFilter, setDirFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: periods = [] } = useQuery({

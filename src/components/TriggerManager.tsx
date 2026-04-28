@@ -165,13 +165,28 @@ function CustomRuleEditor({ customs }: { customs: Tables<"custom_triggers">[] })
                       <SelectContent><SelectItem value="AND">AND</SelectItem><SelectItem value="OR">OR</SelectItem></SelectContent>
                     </Select>
                   )}
-                  <Select value={c.field} onValueChange={(v) => setConds(conds.map((x, j) => j === i ? { ...x, field: v } : x))}>
+                  <Select value={c.field} onValueChange={(v) => setConds(conds.map((x, j) => {
+                    if (j !== i) return x;
+                    const isCat = !!FIELD_OPTIONS[v];
+                    const isNum = NUMERIC_FIELDS.has(v);
+                    // Auto-pick a sensible operator and reset value when switching field types
+                    let op = x.op;
+                    if (isCat && !["=", "!=", "contains", "starts_with"].includes(op)) op = "=";
+                    if (isNum && ![">", ">=", "<", "<=", "=", "!="].includes(op)) op = ">";
+                    return { ...x, field: v, op, value: "" };
+                  }))}>
                     <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{TXN_FIELDS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
                   </Select>
                   <Select value={c.op} onValueChange={(v) => setConds(conds.map((x, j) => j === i ? { ...x, op: v } : x))}>
                     <SelectTrigger className="w-[100px] h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>{OPS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                      {OPS.filter((o) => {
+                        const isCat = !!FIELD_OPTIONS[c.field];
+                        if (isCat) return ["=", "!=", "contains", "starts_with"].includes(o.value);
+                        return true;
+                      }).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                   <ValueInput
                     field={c.field}

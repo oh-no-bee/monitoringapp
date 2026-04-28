@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TriggerManager } from "@/components/TriggerManager";
+import { RiskTrendChart } from "@/components/RiskTrendChart";
 import type { Tables } from "@/integrations/supabase/types";
 
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -228,6 +229,7 @@ export function Dashboard() {
 
         {activePeriod && (
           <>
+            {periods.length > 0 && <RiskTrendChart periods={periods} settings={settings} customs={customs} />}
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <StatCard icon={Users} label="Clients" value={stats.total} tone="primary" />

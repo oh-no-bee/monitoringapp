@@ -9,10 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Trash2, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
-import { TXN_FIELDS, OPS } from "@/lib/rules";
+import { TXN_FIELDS, OPS, FIELD_OPTIONS, NUMERIC_FIELDS } from "@/lib/rules";
 
 interface Cond { field: string; op: string; value: string; combine?: "AND" | "OR" }
 

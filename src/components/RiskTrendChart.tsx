@@ -12,10 +12,10 @@ type Setting = Tables<"trigger_settings">;
 type Custom = Tables<"custom_triggers">;
 
 const RISK_COLORS = {
-  Critical: "hsl(var(--destructive))",
-  High: "hsl(var(--accent))",
-  Medium: "hsl(var(--warning))",
-  Low: "hsl(var(--success))",
+  Critical: "var(--destructive)",
+  High: "var(--accent)",
+  Medium: "var(--warning)",
+  Low: "var(--success)",
 };
 
 export function RiskTrendChart({

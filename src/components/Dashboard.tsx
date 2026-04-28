@@ -136,6 +136,7 @@ export function Dashboard() {
   const filtered = results.filter((c) => {
     if (riskFilter !== "ALL" && c.riskLevel !== riskFilter) return false;
     if (typeFilter !== "ALL" && c.clientType !== typeFilter) return false;
+    if (dirFilter !== "ALL" && !c.txns.some((t) => (t.direction || "").toUpperCase().startsWith(dirFilter))) return false;
     if (alertFilter === "CTR" && !c.hasCTR) return false;
     if (alertFilter === "SDA" && !c.hasSDA) return false;
     if (alertFilter === "BOTH" && !(c.hasCTR && c.hasSDA)) return false;

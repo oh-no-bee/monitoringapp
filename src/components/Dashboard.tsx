@@ -210,9 +210,14 @@ export function Dashboard() {
                       {p.period_label} <span className="ml-2 text-[10px] opacity-60">{p.row_count}</span>
                     </TabsTrigger>
                   ))}
+                  {periods.length > 1 && (
+                    <TabsTrigger value={ALL_PERIODS} className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+                      All Months <span className="ml-2 text-[10px] opacity-60">{periods.reduce((a, p) => a + (p.row_count || 0), 0)}</span>
+                    </TabsTrigger>
+                  )}
                 </TabsList>
               </Tabs>
-              {activePeriodObj && (
+              {activePeriodObj && activePeriod !== ALL_PERIODS && (
                 <Button size="sm" variant="ghost" onClick={() => { if (confirm(`Delete ${activePeriodObj.period_label}?`)) deletePeriod.mutate(activePeriodObj.id); }}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>

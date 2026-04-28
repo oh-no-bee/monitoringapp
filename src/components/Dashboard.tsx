@@ -163,7 +163,7 @@ export function Dashboard() {
   };
 
   const activePeriodObj = periods.find((p) => p.id === activePeriod);
-  const periodLabel = activePeriodObj?.period_label || "Current";
+  const periodLabel = activePeriod === ALL_PERIODS ? "All Months Combined" : (activePeriodObj?.period_label || "Current");
 
   const toggle = (k: string) => {
     const n = new Set(expanded);

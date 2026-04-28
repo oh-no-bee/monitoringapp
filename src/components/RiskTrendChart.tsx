@@ -83,8 +83,9 @@ export function RiskTrendChart({
             <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
             <Tooltip
               contentStyle={{
-                background: "hsl(var(--popover))",
-                border: "1px solid hsl(var(--border))",
+                background: "var(--popover)",
+                color: "var(--popover-foreground)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 fontSize: 12,
               }}

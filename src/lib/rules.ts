@@ -205,13 +205,21 @@ function evaluateCustom(ct: CustomTrigger, txns: Txn[], totalZAR: number): boole
     return result;
   };
 
-  if (ct.aggregation === "per_transaction") return txns.some(checkRow);
-  if (ct.aggregation === "per_client_total") {
-    return checkRow({ total: totalZAR, txn_count: txns.length });
+  // Client-level context shared across aggregations so rules can mix
+  // per-client metrics (totals, count) with client attributes (type, name).
+  const clientCtx = {
+    client_type: str(txns[0]?.client_type),
+    client_name: str(txns[0]?.client_name),
+    total: totalZAR,
+    txn_count: txns.length,
+  };
+
+  if (ct.aggregation === "per_transaction") {
+    // Each txn evaluated with client-level fallbacks merged in
+    return txns.some((t) => checkRow({ ...clientCtx, ...(t as unknown as Record<string, unknown>) }));
   }
-  if (ct.aggregation === "per_client_count") {
-    return checkRow({ txn_count: txns.length });
-  }
+  if (ct.aggregation === "per_client_total") return checkRow(clientCtx);
+  if (ct.aggregation === "per_client_count") return checkRow(clientCtx);
   return false;
 }
 

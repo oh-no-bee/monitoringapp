@@ -215,3 +215,56 @@ function CustomRuleEditor({ customs }: { customs: Tables<"custom_triggers">[] })
     </div>
   );
 }
+
+function ValueInput({ field, value, op, onChange }: { field: string; value: string; op: string; onChange: (v: string) => void }) {
+  const options = FIELD_OPTIONS[field];
+  const isNumeric = NUMERIC_FIELDS.has(field);
+  const isCategorical = !!options && (op === "=" || op === "!=" || op === "contains" || op === "starts_with");
+
+  if (isCategorical) {
+    const selected = value.split(",").map((s) => s.trim()).filter(Boolean);
+    const toggle = (v: string) => {
+      const set = new Set(selected);
+      if (set.has(v)) set.delete(v); else set.add(v);
+      onChange(Array.from(set).join(","));
+    };
+    const labelText = selected.length === 0
+      ? "Select…"
+      : selected.length <= 2
+        ? selected.join(", ")
+        : `${selected.length} selected`;
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-9 w-44 justify-between font-normal">
+            <span className="truncate">{labelText}</span>
+            <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2" align="start">
+          <div className="max-h-64 overflow-auto space-y-1">
+            {options!.map((o) => (
+              <label key={o.value} className="flex items-center gap-2 text-sm px-2 py-1.5 rounded hover:bg-accent cursor-pointer">
+                <Checkbox checked={selected.includes(o.value)} onCheckedChange={() => toggle(o.value)} />
+                <span className="flex-1">{o.label}</span>
+              </label>
+            ))}
+          </div>
+          {selected.length > 0 && (
+            <Button variant="ghost" size="sm" className="w-full mt-1 h-7 text-xs" onClick={() => onChange("")}>Clear</Button>
+          )}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return (
+    <Input
+      type={isNumeric ? "number" : "text"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="value"
+      className="h-9 w-32"
+    />
+  );
+}

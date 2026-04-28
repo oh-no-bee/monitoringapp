@@ -229,6 +229,7 @@ export function Dashboard() {
 
         {activePeriod && (
           <>
+            {periods.length > 0 && <RiskTrendChart periods={periods} settings={settings} customs={customs} />}
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <StatCard icon={Users} label="Clients" value={stats.total} tone="primary" />

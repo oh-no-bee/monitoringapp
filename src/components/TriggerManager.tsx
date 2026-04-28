@@ -86,9 +86,9 @@ function CustomRuleEditor({ customs }: { customs: Tables<"custom_triggers">[] })
       if (!label.trim()) throw new Error("Label required");
       const cleaned = conds.filter((c) => c.value !== "");
       if (!cleaned.length) throw new Error("Add at least one condition with a value");
-      const { error } = await supabase.from("custom_triggers").insert({
-        label, description: desc, severity, aggregation: agg, conditions: cleaned, enabled: true,
-      });
+      const { error } = await supabase.from("custom_triggers").insert([{
+        label, description: desc, severity, aggregation: agg, conditions: cleaned as never, enabled: true,
+      }]);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Custom rule created"); reset(); qc.invalidateQueries({ queryKey: ["custom_triggers"] }); },

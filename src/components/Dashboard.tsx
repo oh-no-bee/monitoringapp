@@ -256,6 +256,15 @@ export function Dashboard() {
                     <SelectItem value="BOTH">CTR + SDA</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Client Type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Client Types</SelectItem>
+                    {clientTypes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="flex-1" />
                 <Button variant="outline" size="sm" onClick={() => exportExcel(filtered, periodLabel)} disabled={!filtered.length}>
                   <FileDown className="mr-2 h-4 w-4" />Excel

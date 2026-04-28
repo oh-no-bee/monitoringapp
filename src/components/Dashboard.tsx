@@ -48,6 +48,8 @@ export function Dashboard() {
     },
   });
 
+  const ALL_PERIODS = "__ALL__";
+
   const { data: settings = [] } = useQuery({
     queryKey: ["trigger_settings"],
     queryFn: async () => {

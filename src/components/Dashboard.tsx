@@ -129,14 +129,17 @@ export function Dashboard() {
     onSuccess: () => { toast.success("Period removed"); setActivePeriod(null); qc.invalidateQueries({ queryKey: ["periods"] }); },
   });
 
-  const results: ClientResult[] = txns.length ? runRules(txns, settings, customs) : [];
+  const dirTxns = dirFilter === "ALL"
+    ? txns
+    : txns.filter((t) => (t.direction || "").toUpperCase().startsWith(dirFilter));
+
+  const results: ClientResult[] = dirTxns.length ? runRules(dirTxns, settings, customs) : [];
 
   const clientTypes = Array.from(new Set(results.map((r) => r.clientType).filter(Boolean))).sort();
 
   const filtered = results.filter((c) => {
     if (riskFilter !== "ALL" && c.riskLevel !== riskFilter) return false;
     if (typeFilter !== "ALL" && c.clientType !== typeFilter) return false;
-    if (dirFilter !== "ALL" && !c.txns.some((t) => (t.direction || "").toUpperCase().startsWith(dirFilter))) return false;
     if (alertFilter === "CTR" && !c.hasCTR) return false;
     if (alertFilter === "SDA" && !c.hasSDA) return false;
     if (alertFilter === "BOTH" && !(c.hasCTR && c.hasSDA)) return false;

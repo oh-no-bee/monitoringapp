@@ -173,7 +173,12 @@ function CustomRuleEditor({ customs }: { customs: Tables<"custom_triggers">[] })
                     <SelectTrigger className="w-[100px] h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{OPS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                   </Select>
-                  <Input value={c.value} onChange={(e) => setConds(conds.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} placeholder="value" className="h-9 w-32" />
+                  <ValueInput
+                    field={c.field}
+                    value={c.value}
+                    op={c.op}
+                    onChange={(v) => setConds(conds.map((x, j) => j === i ? { ...x, value: v } : x))}
+                  />
                   {conds.length > 1 && (
                     <Button size="sm" variant="ghost" onClick={() => setConds(conds.filter((_, j) => j !== i))}><X className="h-3 w-3" /></Button>
                   )}

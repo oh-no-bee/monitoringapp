@@ -14,7 +14,205 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analyst_comments: {
+        Row: {
+          client_name: string
+          comment: string
+          id: string
+          period_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          comment?: string
+          id?: string
+          period_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          comment?: string
+          id?: string
+          period_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analyst_comments_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "upload_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_triggers: {
+        Row: {
+          aggregation: string
+          conditions: Json
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          label: string
+          severity: string
+          updated_at: string
+        }
+        Insert: {
+          aggregation?: string
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          label: string
+          severity?: string
+          updated_at?: string
+        }
+        Update: {
+          aggregation?: string
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          label?: string
+          severity?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          client_name: string | null
+          client_type: string | null
+          created_at: string
+          currency: string | null
+          deal_code: string | null
+          direction: string | null
+          id: string
+          period_id: string
+          product: string | null
+          sanction_check: string | null
+          sanction_hits: string | null
+          sanction_match: string | null
+          teller: string | null
+          total: number | null
+          txn_date: string | null
+        }
+        Insert: {
+          client_name?: string | null
+          client_type?: string | null
+          created_at?: string
+          currency?: string | null
+          deal_code?: string | null
+          direction?: string | null
+          id?: string
+          period_id: string
+          product?: string | null
+          sanction_check?: string | null
+          sanction_hits?: string | null
+          sanction_match?: string | null
+          teller?: string | null
+          total?: number | null
+          txn_date?: string | null
+        }
+        Update: {
+          client_name?: string | null
+          client_type?: string | null
+          created_at?: string
+          currency?: string | null
+          deal_code?: string | null
+          direction?: string | null
+          id?: string
+          period_id?: string
+          product?: string | null
+          sanction_check?: string | null
+          sanction_hits?: string | null
+          sanction_match?: string | null
+          teller?: string | null
+          total?: number | null
+          txn_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "upload_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trigger_settings: {
+        Row: {
+          category: string
+          description: string | null
+          enabled: boolean
+          id: string
+          label: string
+          threshold: number | null
+          trigger_key: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          label: string
+          threshold?: number | null
+          trigger_key: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          label?: string
+          threshold?: number | null
+          trigger_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      upload_periods: {
+        Row: {
+          filename: string | null
+          id: string
+          month: number
+          period_key: string
+          period_label: string
+          row_count: number
+          uploaded_at: string
+          year: number
+        }
+        Insert: {
+          filename?: string | null
+          id?: string
+          month: number
+          period_key: string
+          period_label: string
+          row_count?: number
+          uploaded_at?: string
+          year: number
+        }
+        Update: {
+          filename?: string | null
+          id?: string
+          month?: number
+          period_key?: string
+          period_label?: string
+          row_count?: number
+          uploaded_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

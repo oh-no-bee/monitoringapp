@@ -190,13 +190,34 @@ function evaluateCustom(ct: CustomTrigger, txns: Txn[], totalZAR: number): boole
   const conds = (ct.conditions as unknown as Cond[]) || [];
   if (!conds.length) return false;
 
+  // For per-client rules, aggregate categorical fields across all txns so a
+  // condition like `product = CASH` matches if ANY of the client's txns are CASH.
+  const collect = (key: keyof Txn) =>
+    Array.from(new Set(txns.map((t) => str(t[key])).filter(Boolean))).join(",");
+
+  const clientCtx: Record<string, unknown> = {
+    client_type: str(txns[0]?.client_type),
+    client_name: str(txns[0]?.client_name),
+    total: totalZAR,
+    txn_count: txns.length,
+    product: collect("product"),
+    currency: collect("currency"),
+    direction: collect("direction"),
+    teller: collect("teller"),
+    sanction_check: collect("sanction_check"),
+    sanction_match: collect("sanction_match"),
+    sanction_hits: collect("sanction_hits"),
+  };
+
   const checkRow = (row: Record<string, unknown>): boolean => {
     let result = true;
     let combine: "AND" | "OR" = "AND";
     for (let i = 0; i < conds.length; i++) {
       const c = conds[i];
+      // For per-client aggregated categorical fields, treat the row value as a
+      // comma-separated list and test if ANY entry matches.
       const fieldVal = row[c.field];
-      const got = matchOp(fieldVal, c.op, c.value);
+      const got = matchOpAny(fieldVal, c.op, c.value);
       if (i === 0) result = got;
       else if (combine === "AND") result = result && got;
       else result = result || got;
@@ -205,22 +226,25 @@ function evaluateCustom(ct: CustomTrigger, txns: Txn[], totalZAR: number): boole
     return result;
   };
 
-  // Client-level context shared across aggregations so rules can mix
-  // per-client metrics (totals, count) with client attributes (type, name).
-  const clientCtx = {
-    client_type: str(txns[0]?.client_type),
-    client_name: str(txns[0]?.client_name),
-    total: totalZAR,
-    txn_count: txns.length,
-  };
-
   if (ct.aggregation === "per_transaction") {
-    // Each txn evaluated with client-level fallbacks merged in
+    // Each txn evaluated with client-level fallbacks merged in (txn fields win)
     return txns.some((t) => checkRow({ ...clientCtx, ...(t as unknown as Record<string, unknown>) }));
   }
   if (ct.aggregation === "per_client_total") return checkRow(clientCtx);
   if (ct.aggregation === "per_client_count") return checkRow(clientCtx);
   return false;
+}
+
+// Wraps matchOp so that aggregated row values (comma-separated lists from
+// multiple txns) are tested element-by-element for categorical operators.
+function matchOpAny(field: unknown, op: string, value: string | number): boolean {
+  const s = String(field ?? "");
+  if (s.includes(",") && (op === "=" || op === "!=" || op === "contains" || op === "starts_with")) {
+    const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+    if (op === "!=") return parts.every((p) => matchOp(p, op, value));
+    return parts.some((p) => matchOp(p, op, value));
+  }
+  return matchOp(field, op, value);
 }
 
 function matchOp(field: unknown, op: string, value: string | number): boolean {

@@ -68,6 +68,22 @@ export function Dashboard() {
     },
   });
 
+  // Realtime: when rules/settings/comments change anywhere, refresh on this device
+  useEffect(() => {
+    const channel = supabase
+      .channel("rules-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "custom_triggers" },
+        () => qc.invalidateQueries({ queryKey: ["custom_triggers"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "trigger_settings" },
+        () => qc.invalidateQueries({ queryKey: ["trigger_settings"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "analyst_comments" },
+        () => qc.invalidateQueries({ queryKey: ["analyst_comments"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "upload_periods" },
+        () => qc.invalidateQueries({ queryKey: ["periods"] }))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
   const { data: txns = [], isFetching: txnLoading } = useQuery({
     queryKey: ["txns", activePeriod],
     enabled: !!activePeriod,

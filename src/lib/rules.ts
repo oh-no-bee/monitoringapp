@@ -89,14 +89,20 @@ export function runRules(
         triggers.set("sanction_bypass", { label: `Sanction Bypass (>${sanctT.toLocaleString()} & No Check)`, severity: "Critical", key: "sanction_bypass" });
       }
 
-      // structuring (cash/local daily)
+      // structuring + smurf-count (cash/local daily)
       if (isCashLocal) {
         dailyCash[dateStr] = (dailyCash[dateStr] || 0) + total;
+        dailyCashCount[dateStr] = (dailyCashCount[dateStr] || 0) + 1;
         const structT = thr(settings, "structuring", 45000);
         if (structT != null && dailyCash[dateStr] >= structT) {
-          triggers.set("structuring", { label: `Structuring Risk (Cash/Local ≥ ${structT.toLocaleString()}/day)`, severity: "High", key: "structuring" });
+          triggers.set("structuring", { label: `Structuring / Smurfing (Cash ≥ ${structT.toLocaleString()}/day)`, severity: "High", key: "structuring" });
+        }
+        const smurfCT = thr(settings, "smurf_count", 4);
+        if (smurfCT != null && dailyCashCount[dateStr] >= smurfCT) {
+          triggers.set("smurf_count", { label: `Smurf Pattern (≥${smurfCT} Cash txns same day)`, severity: "High", key: "smurf_count" });
         }
       }
+      if (product) productSet.add(product);
 
       // CTR ZAR
       const ctrT = thr(settings, "ctr_zar", 49999.99);

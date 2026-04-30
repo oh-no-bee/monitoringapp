@@ -204,6 +204,7 @@ export function Dashboard() {
               {upload.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               Upload Excel
             </Button>
+            <LogoManager />
             <Sheet open={triggersOpen} onOpenChange={setTriggersOpen}>
               <SheetTrigger asChild>
                 <Button variant="secondary" size="sm"><Settings className="mr-2 h-4 w-4" />Triggers</Button>

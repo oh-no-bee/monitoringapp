@@ -16,6 +16,7 @@ import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert
 import { toast } from "sonner";
 import { TriggerManager } from "@/components/TriggerManager";
 import { RiskTrendChart } from "@/components/RiskTrendChart";
+import { FlaggedClients } from "@/components/FlaggedClients";
 import type { Tables } from "@/integrations/supabase/types";
 
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -37,6 +38,8 @@ export function Dashboard() {
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dirFilter, setDirFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"dashboard" | "flagged">("dashboard");
+  const [triggersOpen, setTriggersOpen] = useState(false);
 
   const { data: periods = [] } = useQuery({
     queryKey: ["periods"],
@@ -200,7 +203,7 @@ export function Dashboard() {
               {upload.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               Upload Excel
             </Button>
-            <Sheet>
+            <Sheet open={triggersOpen} onOpenChange={setTriggersOpen}>
               <SheetTrigger asChild>
                 <Button variant="secondary" size="sm"><Settings className="mr-2 h-4 w-4" />Triggers</Button>
               </SheetTrigger>
@@ -214,6 +217,25 @@ export function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-[1500px] px-6 py-6 space-y-6">
+        {/* Top-level view switcher */}
+        {periods.length > 0 && (
+          <Tabs value={view} onValueChange={(v) => setView(v as "dashboard" | "flagged")}>
+            <TabsList className="bg-muted/60">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Users className="mr-2 h-4 w-4" /> Compliance Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="flagged" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+                <ShieldAlert className="mr-2 h-4 w-4" /> Flagged Clients
+                {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length > 0 && (
+                  <span className="ml-2 rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-bold">
+                    {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
         {/* Period tabs */}
         {periods.length > 0 ? (
           <Card className="p-3">
@@ -253,7 +275,15 @@ export function Dashboard() {
           </Card>
         )}
 
-        {activePeriod && (
+        {activePeriod && view === "flagged" && (
+          <FlaggedClients
+            results={results}
+            periodLabel={periodLabel}
+            onOpenTriggers={() => setTriggersOpen(true)}
+          />
+        )}
+
+        {activePeriod && view === "dashboard" && (
           <>
             {periods.length > 0 && <RiskTrendChart periods={periods} settings={settings} customs={customs} />}
             {/* Stats */}

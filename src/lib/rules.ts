@@ -162,6 +162,12 @@ export function runRules(
     const cdT = thr(settings, "currency_diversity", 3);
     if (cdT != null && currencies.size > cdT) triggers.set("currency_diversity", { label: `Currency Diversification (>${cdT})`, severity: "Medium", key: "currency_diversity" });
 
+    // Layering — distinct products used by same client
+    const layerT = thr(settings, "layering_products", 3);
+    if (layerT != null && productSet.size >= layerT) {
+      triggers.set("layering_products", { label: `Rapid Layering (${productSet.size} products: ${Array.from(productSet).join("/")})`, severity: "High", key: "layering_products" });
+    }
+
     // Custom triggers
     for (const ct of customs) {
       if (!ct.enabled) continue;

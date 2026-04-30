@@ -57,6 +57,8 @@ export function runRules(
     let totalZAR = 0;
     let usdBuy = false, usdSell = false;
     const dailyCash: Record<string, number> = {};
+    const dailyCashCount: Record<string, number> = {};
+    const productSet = new Set<string>();
     const monthTotals: Record<string, number> = {};
     let sdaTotal = 0;
     let sdaNote = "";

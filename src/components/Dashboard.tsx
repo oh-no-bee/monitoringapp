@@ -275,7 +275,15 @@ export function Dashboard() {
           </Card>
         )}
 
-        {activePeriod && (
+        {activePeriod && view === "flagged" && (
+          <FlaggedClients
+            results={results}
+            periodLabel={periodLabel}
+            onOpenTriggers={() => setTriggersOpen(true)}
+          />
+        )}
+
+        {activePeriod && view === "dashboard" && (
           <>
             {periods.length > 0 && <RiskTrendChart periods={periods} settings={settings} customs={customs} />}
             {/* Stats */}

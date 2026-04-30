@@ -38,6 +38,8 @@ export function Dashboard() {
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dirFilter, setDirFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"dashboard" | "flagged">("dashboard");
+  const [triggersOpen, setTriggersOpen] = useState(false);
 
   const { data: periods = [] } = useQuery({
     queryKey: ["periods"],

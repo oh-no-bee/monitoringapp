@@ -217,6 +217,25 @@ export function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-[1500px] px-6 py-6 space-y-6">
+        {/* Top-level view switcher */}
+        {periods.length > 0 && (
+          <Tabs value={view} onValueChange={(v) => setView(v as "dashboard" | "flagged")}>
+            <TabsList className="bg-muted/60">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Users className="mr-2 h-4 w-4" /> Compliance Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="flagged" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+                <ShieldAlert className="mr-2 h-4 w-4" /> Flagged Clients
+                {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length > 0 && (
+                  <span className="ml-2 rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-bold">
+                    {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
         {/* Period tabs */}
         {periods.length > 0 ? (
           <Card className="p-3">

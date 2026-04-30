@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { TriggerManager } from "@/components/TriggerManager";
 import { RiskTrendChart } from "@/components/RiskTrendChart";
 import { FlaggedClients } from "@/components/FlaggedClients";
+import { LogoManager } from "@/components/LogoManager";
 import type { Tables } from "@/integrations/supabase/types";
 
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -203,6 +204,7 @@ export function Dashboard() {
               {upload.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               Upload Excel
             </Button>
+            <LogoManager />
             <Sheet open={triggersOpen} onOpenChange={setTriggersOpen}>
               <SheetTrigger asChild>
                 <Button variant="secondary" size="sm"><Settings className="mr-2 h-4 w-4" />Triggers</Button>

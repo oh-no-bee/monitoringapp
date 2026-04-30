@@ -49,6 +49,24 @@ export type Database = {
           },
         ]
       }
+      branding: {
+        Row: {
+          id: string
+          logo_data_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          logo_data_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          logo_data_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       custom_triggers: {
         Row: {
           aggregation: string

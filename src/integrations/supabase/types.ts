@@ -171,6 +171,7 @@ export type Database = {
           description: string | null
           enabled: boolean
           id: string
+          is_hidden: boolean
           label: string
           threshold: number | null
           trigger_key: string
@@ -181,6 +182,7 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
+          is_hidden?: boolean
           label: string
           threshold?: number | null
           trigger_key: string
@@ -191,6 +193,7 @@ export type Database = {
           description?: string | null
           enabled?: boolean
           id?: string
+          is_hidden?: boolean
           label?: string
           threshold?: number | null
           trigger_key?: string
@@ -228,6 +231,36 @@ export type Database = {
           row_count?: number
           uploaded_at?: string
           year?: number
+        }
+        Relationships: []
+      }
+      watchlist_assignments: {
+        Row: {
+          client_name: string
+          created_at: string
+          enabled: boolean
+          id: string
+          note: string | null
+          trigger_key: string
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          note?: string | null
+          trigger_key: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          note?: string | null
+          trigger_key?: string
+          updated_at?: string
         }
         Relationships: []
       }

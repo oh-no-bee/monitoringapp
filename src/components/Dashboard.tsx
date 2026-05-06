@@ -12,11 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { TriggerManager } from "@/components/TriggerManager";
 import { RiskTrendChart } from "@/components/RiskTrendChart";
 import { FlaggedClients } from "@/components/FlaggedClients";
+import { WatchList } from "@/components/WatchList";
 import { LogoManager } from "@/components/LogoManager";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -39,7 +40,7 @@ export function Dashboard() {
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dirFilter, setDirFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<"dashboard" | "flagged">("dashboard");
+  const [view, setView] = useState<"dashboard" | "flagged" | "watchlist">("dashboard");
   const [triggersOpen, setTriggersOpen] = useState(false);
 
   const { data: periods = [] } = useQuery({
@@ -84,6 +85,8 @@ export function Dashboard() {
         () => qc.invalidateQueries({ queryKey: ["analyst_comments"] }))
       .on("postgres_changes", { event: "*", schema: "public", table: "upload_periods" },
         () => qc.invalidateQueries({ queryKey: ["periods"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "watchlist_assignments" },
+        () => qc.invalidateQueries({ queryKey: ["watchlist_assignments"] }))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [qc]);
@@ -221,18 +224,21 @@ export function Dashboard() {
       <main className="mx-auto max-w-[1500px] px-6 py-6 space-y-6">
         {/* Top-level view switcher */}
         {periods.length > 0 && (
-          <Tabs value={view} onValueChange={(v) => setView(v as "dashboard" | "flagged")}>
+          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
             <TabsList className="bg-muted/60">
-              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
                 <Users className="mr-2 h-4 w-4" /> Compliance Dashboard
               </TabsTrigger>
-              <TabsTrigger value="flagged" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+              <TabsTrigger value="flagged" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground transition-all">
                 <ShieldAlert className="mr-2 h-4 w-4" /> Flagged Clients
                 {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length > 0 && (
-                  <span className="ml-2 rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-bold">
+                  <span className="ml-2 rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-bold animate-pulse">
                     {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length}
                   </span>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="watchlist" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all">
+                <Eye className="mr-2 h-4 w-4" /> Watch List
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -283,6 +289,10 @@ export function Dashboard() {
             periodLabel={periodLabel}
             onOpenTriggers={() => setTriggersOpen(true)}
           />
+        )}
+
+        {periods.length > 0 && view === "watchlist" && (
+          <WatchList periods={periods} onOpenTriggers={() => setTriggersOpen(true)} />
         )}
 
         {activePeriod && view === "dashboard" && (
@@ -455,7 +465,7 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: React.ElementType;
     accent: "from-accent to-accent-glow",
   };
   return (
-    <Card className="p-4 overflow-hidden relative">
+    <Card className="p-4 overflow-hidden relative transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)] animate-fade-in">
       <div className={`absolute -right-4 -top-4 h-20 w-20 rounded-full bg-gradient-to-br ${tones[tone]} opacity-10`} />
       <div className="flex items-start justify-between">
         <div>

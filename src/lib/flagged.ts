@@ -96,13 +96,30 @@ export function buildFlagged(results: ClientResult[]): FlaggedClient[] {
           (c.triggerCount >= 4 ? 10 : 0),
       );
 
-      const triggerNames = c.triggers.map((t) => t.label).join("; ") || "no specific rule";
+      const action = recommendedAction(c);
+      const ccyList = c.currencies.filter((x) => x && x !== "ZAR");
+      const ccyPhrase = ccyList.length
+        ? `across ${ccyList.length} foreign currenc${ccyList.length === 1 ? "y" : "ies"} (${ccyList.slice(0, 5).join(", ")}${ccyList.length > 5 ? "…" : ""}) alongside the local rand book`
+        : "exclusively in South African rand";
+      const reasonStory =
+        reasons.length === 0
+          ? " "
+          : reasons.length === 1
+            ? ` The single concern driving this assessment is that ${lower(reasons[0])} `
+            : ` The picture that emerges is concerning: ${reasons
+                .map((r, i) => (i === reasons.length - 1 ? `and finally ${lower(r)}` : lower(r)))
+                .join("; ")} `;
+
       const narrative =
-        `${c.clientName} (${c.clientType || "unclassified"}) processed ${c.txnCount} transactions ` +
-        `totalling ${fmtZ(c.totalZAR)} during the period and breached ${c.triggers.length} ` +
-        `compliance rule${c.triggers.length === 1 ? "" : "s"}: ${triggerNames}. ` +
-        `Risk rated ${c.riskLevel} (score ${score}/100) under FICA / FIC ongoing-monitoring obligations. ` +
-        `${recommendedAction(c)}`;
+        `${c.clientName}, classified as ${c.clientType || "an unclassified client"}, ` +
+        `moved a total of ${fmtZ(c.totalZAR)} through ${c.txnCount} transaction${c.txnCount === 1 ? "" : "s"} ` +
+        `${ccyPhrase} during the reporting period. ` +
+        `Under FICA and FIC ongoing-monitoring obligations the activity scores ${score} out of 100, ` +
+        `placing the relationship in the ${c.riskLevel.toLowerCase()} risk band.` +
+        reasonStory +
+        `Taken together these patterns are inconsistent with routine retail or commercial behaviour and require deliberate intervention. ` +
+        `The recommended next step is to ${lower(action.replace(/\.$/, ""))}, documenting every step in the client file ` +
+        `so the bank can demonstrate to the FIC and SARB that the ongoing-monitoring obligation has been discharged in good faith.`;
 
       return {
         clientName: c.clientName,
@@ -114,8 +131,12 @@ export function buildFlagged(results: ClientResult[]): FlaggedClient[] {
         triggers: c.triggers,
         reasons,
         narrative,
-        recommendedAction: recommendedAction(c),
+        recommendedAction: action,
       };
     })
     .sort((a, b) => b.riskScore - a.riskScore || b.totalZAR - a.totalZAR);
+}
+
+function lower(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }

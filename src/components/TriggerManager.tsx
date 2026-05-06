@@ -23,42 +23,90 @@ export function TriggerManager({ settings, customs }: { settings: Tables<"trigge
 
   const updateSetting = useMutation({
     mutationFn: async (s: Partial<Tables<"trigger_settings">> & { id: string }) => {
-      const { error } = await supabase.from("trigger_settings").update({ threshold: s.threshold, enabled: s.enabled, updated_at: new Date().toISOString() }).eq("id", s.id);
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      for (const k of ["threshold", "enabled", "label", "description", "is_hidden"] as const) {
+        if (k in s) patch[k] = (s as Record<string, unknown>)[k];
+      }
+      const { error } = await supabase.from("trigger_settings").update(patch as never).eq("id", s.id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Saved"); qc.invalidateQueries({ queryKey: ["trigger_settings"] }); },
+    onError: (e: Error) => toast.error(e.message),
   });
+
+  const removeSetting = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("trigger_settings").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Built-in rule removed"); qc.invalidateQueries({ queryKey: ["trigger_settings"] }); },
+  });
+
+  const addBuiltin = useMutation({
+    mutationFn: async () => {
+      const trigger_key = `extra_${Date.now()}`;
+      const { error } = await supabase.from("trigger_settings").insert({
+        trigger_key, label: "New Built-in Rule", description: "Edit the label and threshold to suit your needs.",
+        threshold: 100000, enabled: true, category: "built-in",
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Built-in rule added"); qc.invalidateQueries({ queryKey: ["trigger_settings"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const visible = settings.filter((s) => !(s as Tables<"trigger_settings"> & { is_hidden?: boolean }).is_hidden);
+  const hidden = settings.filter((s) => (s as Tables<"trigger_settings"> & { is_hidden?: boolean }).is_hidden);
 
   return (
     <Tabs defaultValue="builtin" className="mt-4">
       <TabsList className="w-full">
-        <TabsTrigger value="builtin" className="flex-1">Built-in Rules ({settings.length})</TabsTrigger>
-        <TabsTrigger value="custom" className="flex-1">Custom Rules ({customs.length})</TabsTrigger>
+        <TabsTrigger value="builtin" className="flex-1">Built-in ({visible.length})</TabsTrigger>
+        <TabsTrigger value="custom" className="flex-1">Custom ({customs.length})</TabsTrigger>
+        {hidden.length > 0 && <TabsTrigger value="hidden" className="flex-1">Hidden ({hidden.length})</TabsTrigger>}
       </TabsList>
 
       <TabsContent value="builtin" className="space-y-2 mt-4">
-        {settings.map((s) => (
-          <Card key={s.id} className="p-3">
+        <Button size="sm" variant="outline" onClick={() => addBuiltin.mutate()} className="w-full">
+          <Plus className="mr-2 h-4 w-4" />Add new built-in rule
+        </Button>
+        {visible.map((s) => (
+          <Card key={s.id} className="p-3 animate-fade-in">
             <div className="flex items-start gap-3">
-              <Switch checked={s.enabled} onCheckedChange={(v) => updateSetting.mutate({ id: s.id, enabled: v, threshold: s.threshold })} />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm">{s.label}</div>
-                <div className="text-xs text-muted-foreground">{s.description}</div>
+              <Switch checked={s.enabled} onCheckedChange={(v) => updateSetting.mutate({ id: s.id, enabled: v })} />
+              <div className="flex-1 min-w-0 space-y-2">
+                <Input
+                  defaultValue={s.label}
+                  className="h-8 font-semibold"
+                  onBlur={(e) => { if (e.target.value !== s.label) updateSetting.mutate({ id: s.id, label: e.target.value }); }}
+                />
+                <Textarea
+                  defaultValue={s.description ?? ""}
+                  rows={2}
+                  className="text-xs"
+                  onBlur={(e) => { if (e.target.value !== (s.description ?? "")) updateSetting.mutate({ id: s.id, description: e.target.value }); }}
+                />
                 {s.threshold != null && (
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <Label className="text-xs">Threshold</Label>
                     <Input
-                      type="number"
-                      step="0.01"
-                      defaultValue={Number(s.threshold)}
-                      className="h-8 w-40"
+                      type="number" step="0.01" defaultValue={Number(s.threshold)} className="h-8 w-40"
                       onBlur={(e) => {
                         const v = Number(e.target.value);
-                        if (v !== Number(s.threshold)) updateSetting.mutate({ id: s.id, threshold: v, enabled: s.enabled });
+                        if (v !== Number(s.threshold)) updateSetting.mutate({ id: s.id, threshold: v });
                       }}
                     />
                   </div>
                 )}
+                <div className="text-[10px] text-muted-foreground font-mono">key: {s.trigger_key}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Button size="sm" variant="ghost" title="Hide" onClick={() => updateSetting.mutate({ id: s.id, is_hidden: true })}>
+                  <X className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" title="Delete permanently" onClick={() => { if (confirm(`Delete "${s.label}" permanently?`)) removeSetting.mutate(s.id); }}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </div>
             </div>
           </Card>
@@ -68,6 +116,26 @@ export function TriggerManager({ settings, customs }: { settings: Tables<"trigge
       <TabsContent value="custom" className="mt-4">
         <CustomRuleEditor customs={customs} />
       </TabsContent>
+
+      {hidden.length > 0 && (
+        <TabsContent value="hidden" className="space-y-2 mt-4">
+          <p className="text-xs text-muted-foreground">Hidden rules are skipped by the engine. Restore to re-activate.</p>
+          {hidden.map((s) => (
+            <Card key={s.id} className="p-3 opacity-70">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm">{s.label}</div>
+                  <div className="text-xs text-muted-foreground">{s.description}</div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => updateSetting.mutate({ id: s.id, is_hidden: false })}>Restore</Button>
+                <Button size="sm" variant="ghost" onClick={() => { if (confirm("Delete permanently?")) removeSetting.mutate(s.id); }}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

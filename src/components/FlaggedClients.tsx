@@ -90,13 +90,20 @@ export function FlaggedClients({
         </Card>
       ) : (
         <div className="space-y-3">
-          {filtered.map((c) => (
-            <Card key={c.clientName} className="p-5 border-l-4" style={{ borderLeftColor: c.riskLevel === "Critical" ? "hsl(var(--destructive))" : "hsl(var(--accent))" }}>
+          {filtered.map((c, idx) => (
+            <Card
+              key={c.clientName}
+              className="p-5 border-l-4 animate-fade-in transition-all duration-300 hover:shadow-[var(--shadow-elegant)] hover:-translate-y-0.5"
+              style={{
+                borderLeftColor: c.riskLevel === "Critical" ? "hsl(var(--destructive))" : "hsl(var(--accent))",
+                animationDelay: `${Math.min(idx * 40, 400)}ms`,
+              }}
+            >
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-display text-xl font-bold">{c.clientName}</h3>
-                    <Badge className={riskColors[c.riskLevel]}>{c.riskLevel}</Badge>
+                    <Badge className={`${riskColors[c.riskLevel]} ${c.riskLevel === "Critical" ? "animate-pulse" : ""}`}>{c.riskLevel}</Badge>
                     <Badge variant="outline" className="font-mono">Score {c.riskScore}/100</Badge>
                     {c.clientType && (
                       <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5">{c.clientType}</span>
@@ -106,32 +113,21 @@ export function FlaggedClients({
                     {c.txnCount} transaction{c.txnCount === 1 ? "" : "s"} · Total <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Triggers Hit</div>
-                  <div className="font-display text-3xl font-bold text-accent">{c.triggers.length}</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Triggers Hit</div>
+                    <div className="font-display text-3xl font-bold text-accent">{c.triggers.length}</div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={onOpenTriggers}>
+                    <Settings className="mr-1.5 h-3.5 w-3.5" /> Adjust triggers
+                  </Button>
                 </div>
               </div>
 
-              <p className="mt-3 text-sm leading-relaxed bg-muted/40 rounded-md p-3 border">
+              <p className="mt-3 text-[15px] leading-relaxed bg-muted/40 rounded-md p-4 border italic">
                 <AlertTriangle className="inline h-4 w-4 mr-1 text-accent -mt-0.5" />
                 {c.narrative}
               </p>
-
-              {c.reasons.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                    Why flagged — system reasoning
-                  </div>
-                  <ul className="space-y-1.5">
-                    {c.reasons.map((r, i) => (
-                      <li key={i} className="text-sm flex gap-2">
-                        <span className="text-destructive mt-0.5">▸</span>
-                        <span>{r}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
 
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {c.triggers.map((t) => (
@@ -139,11 +135,6 @@ export function FlaggedClients({
                     {t.label}
                   </span>
                 ))}
-              </div>
-
-              <div className="mt-3 text-sm border-t pt-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mr-2">Recommended action:</span>
-                <span>{c.recommendedAction}</span>
               </div>
             </Card>
           ))}

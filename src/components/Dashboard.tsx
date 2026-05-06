@@ -465,7 +465,7 @@ function StatCard({ icon: Icon, label, value, tone }: { icon: React.ElementType;
     accent: "from-accent to-accent-glow",
   };
   return (
-    <Card className="p-4 overflow-hidden relative">
+    <Card className="p-4 overflow-hidden relative transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elegant)] animate-fade-in">
       <div className={`absolute -right-4 -top-4 h-20 w-20 rounded-full bg-gradient-to-br ${tones[tone]} opacity-10`} />
       <div className="flex items-start justify-between">
         <div>

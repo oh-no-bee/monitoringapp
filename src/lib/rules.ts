@@ -26,7 +26,11 @@ const str = (v: unknown) => (v == null ? "" : String(v));
 const yes = (v: unknown) => str(v).toLowerCase().startsWith("y");
 
 function getSetting(settings: TriggerSetting[], key: string) {
-  return settings.find((s) => s.trigger_key === key);
+  const s = settings.find((x) => x.trigger_key === key);
+  if (!s) return undefined;
+  // Treat hidden settings as if they don't exist
+  if ((s as TriggerSetting & { is_hidden?: boolean }).is_hidden) return undefined;
+  return s;
 }
 function thr(settings: TriggerSetting[], key: string, fallback: number) {
   const s = getSetting(settings, key);

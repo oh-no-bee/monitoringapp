@@ -27,7 +27,7 @@ export function TriggerManager({ settings, customs }: { settings: Tables<"trigge
       for (const k of ["threshold", "enabled", "label", "description", "is_hidden"] as const) {
         if (k in s) patch[k] = (s as Record<string, unknown>)[k];
       }
-      const { error } = await supabase.from("trigger_settings").update(patch).eq("id", s.id);
+      const { error } = await supabase.from("trigger_settings").update(patch as never).eq("id", s.id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Saved"); qc.invalidateQueries({ queryKey: ["trigger_settings"] }); },

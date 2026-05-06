@@ -63,12 +63,9 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
           "Amount (ZAR)", "Amount ZAR", "ZAR",
         ) ?? 0,
       ) || 0;
-      // Use ZAR-equivalent for non-ZAR rows when present so the dashboard sums correctly.
+      // After this transform `total` is ALWAYS in ZAR. Original currency is preserved.
       const hasZarEq = !!(currency && currency !== "ZAR" && zarEq > 0);
       const total = hasZarEq ? zarEq : totalRaw;
-      // When we substitute the ZAR-equivalent we relabel currency to ZAR so the rules engine
-      // (which only sums currency='ZAR') correctly aggregates the period total in rand.
-      const reportingCurrency = hasZarEq ? "ZAR" : currency;
       return {
         deal_code:      String(grab(r, "Deal code", "Deal Code") ?? ""),
         txn_date:       d ? d.toISOString().slice(0, 10) : null,
@@ -79,7 +76,7 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
         sanction_match: String(grab(r, "Sanction Match", "Sanction\nMatch") ?? ""),
         sanction_hits:  String(grab(r, "Sanction Hits") ?? ""),
         product:        String(grab(r, "Product") ?? ""),
-        currency:       reportingCurrency,
+        currency,
         direction:      String(grab(r, "Direction") ?? ""),
         total,
       };

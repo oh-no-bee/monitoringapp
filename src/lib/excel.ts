@@ -63,8 +63,12 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
           "Amount (ZAR)", "Amount ZAR", "ZAR",
         ) ?? 0,
       ) || 0;
-      // Use ZAR-equivalent for non-ZAR rows when present so totals are comparable in rand.
-      const total = currency && currency !== "ZAR" && zarEq > 0 ? zarEq : totalRaw;
+      // Use ZAR-equivalent for non-ZAR rows when present so the dashboard sums correctly.
+      const hasZarEq = !!(currency && currency !== "ZAR" && zarEq > 0);
+      const total = hasZarEq ? zarEq : totalRaw;
+      // When we substitute the ZAR-equivalent we relabel currency to ZAR so the rules engine
+      // (which only sums currency='ZAR') correctly aggregates the period total in rand.
+      const reportingCurrency = hasZarEq ? "ZAR" : currency;
       return {
         deal_code:      String(grab(r, "Deal code", "Deal Code") ?? ""),
         txn_date:       d ? d.toISOString().slice(0, 10) : null,

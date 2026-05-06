@@ -222,18 +222,21 @@ export function Dashboard() {
       <main className="mx-auto max-w-[1500px] px-6 py-6 space-y-6">
         {/* Top-level view switcher */}
         {periods.length > 0 && (
-          <Tabs value={view} onValueChange={(v) => setView(v as "dashboard" | "flagged")}>
+          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
             <TabsList className="bg-muted/60">
-              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
                 <Users className="mr-2 h-4 w-4" /> Compliance Dashboard
               </TabsTrigger>
-              <TabsTrigger value="flagged" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+              <TabsTrigger value="flagged" className="data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground transition-all">
                 <ShieldAlert className="mr-2 h-4 w-4" /> Flagged Clients
                 {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length > 0 && (
-                  <span className="ml-2 rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-bold">
+                  <span className="ml-2 rounded-full bg-background/20 px-1.5 py-0.5 text-[10px] font-bold animate-pulse">
                     {results.filter((r) => r.riskLevel === "Critical" || r.riskLevel === "High").length}
                   </span>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="watchlist" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all">
+                <Eye className="mr-2 h-4 w-4" /> Watch List
               </TabsTrigger>
             </TabsList>
           </Tabs>

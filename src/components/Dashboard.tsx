@@ -289,6 +289,10 @@ export function Dashboard() {
           />
         )}
 
+        {periods.length > 0 && view === "watchlist" && (
+          <WatchList periods={periods} onOpenTriggers={() => setTriggersOpen(true)} />
+        )}
+
         {activePeriod && view === "dashboard" && (
           <>
             {periods.length > 0 && <RiskTrendChart periods={periods} settings={settings} customs={customs} />}

@@ -77,7 +77,8 @@ export function runRules(
       const isLACorLAI = ct === "LAC" || ct === "LAI";
       const isLCorMCPC = ct === "LC" || ct === "MCPC";
 
-      if (currency === "ZAR") totalZAR += total;
+      // total is the ZAR-equivalent (parser converts using the sheet's ZAR column when currency != ZAR)
+      totalZAR += total;
       dealCodes.add(str(t.deal_code));
       currencies.add(currency);
       if (currency === "USD" && direction === "BUY") usdBuy = true;

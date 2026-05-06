@@ -85,6 +85,8 @@ export function Dashboard() {
         () => qc.invalidateQueries({ queryKey: ["analyst_comments"] }))
       .on("postgres_changes", { event: "*", schema: "public", table: "upload_periods" },
         () => qc.invalidateQueries({ queryKey: ["periods"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "watchlist_assignments" },
+        () => qc.invalidateQueries({ queryKey: ["watchlist_assignments"] }))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [qc]);

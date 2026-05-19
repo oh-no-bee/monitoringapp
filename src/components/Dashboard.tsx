@@ -39,6 +39,7 @@ export function Dashboard() {
   const [alertFilter, setAlertFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [dirFilter, setDirFilter] = useState("ALL");
+  const [currencyFilter, setCurrencyFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"dashboard" | "flagged" | "watchlist">("dashboard");
   const [triggersOpen, setTriggersOpen] = useState(false);
@@ -158,9 +159,12 @@ export function Dashboard() {
     onSuccess: () => { toast.success("Period removed"); setActivePeriod(null); qc.invalidateQueries({ queryKey: ["periods"] }); },
   });
 
-  const dirTxns = dirFilter === "ALL"
+  const dirTxns = (dirFilter === "ALL"
     ? txns
-    : txns.filter((t) => (t.direction || "").toUpperCase().startsWith(dirFilter));
+    : txns.filter((t) => (t.direction || "").toUpperCase().startsWith(dirFilter))
+  ).filter((t) => currencyFilter === "ALL" || (t.currency || "").toUpperCase() === currencyFilter);
+
+  const availableCurrencies = Array.from(new Set(txns.map((t) => (t.currency || "").toUpperCase()).filter(Boolean))).sort();
 
   const results: ClientResult[] = dirTxns.length ? runRules(dirTxns, settings, customs) : [];
 
@@ -346,6 +350,15 @@ export function Dashboard() {
                     <SelectItem value="ALL">Buy & Sell</SelectItem>
                     <SelectItem value="B">Buy only</SelectItem>
                     <SelectItem value="S">Sell only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
+                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Currency" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All currencies</SelectItem>
+                    {availableCurrencies.map((c) => (
+                      <SelectItem key={c} value={c}>{c} only</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <div className="flex-1" />

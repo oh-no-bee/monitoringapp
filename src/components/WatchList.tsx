@@ -21,6 +21,8 @@ interface MonthRow {
   periodKey: string; // YYYY-MM
   total: number;
   count: number;
+  zScore: number; // anomaly score vs client's own history
+  isAnomaly: boolean;
 }
 interface WatchClient {
   name: string;
@@ -32,6 +34,12 @@ interface WatchClient {
   lastSeenKey: string;
   missedLastMonth: boolean;
   isNewThisMonth: boolean;
+  // ML insights
+  meanMonthly: number;
+  stdMonthly: number;
+  trend: "rising" | "falling" | "stable";
+  anomalyScore: number; // 0-100 composite
+  mlInsight: string;
 }
 
 export function WatchList({
@@ -112,7 +120,7 @@ export function WatchList({
       if (!period) continue;
       const periodKey = `${period.year}-${String(period.month).padStart(2, "0")}`;
       if (!entry.months.has(periodKey)) {
-        entry.months.set(periodKey, { periodId, label: period.period_label, periodKey, total: 0, count: 0 });
+        entry.months.set(periodKey, { periodId, label: period.period_label, periodKey, total: 0, count: 0, zScore: 0, isAnomaly: false });
       }
       const mrow = entry.months.get(periodKey)!;
       const v = Number(r.total) || 0;
@@ -127,12 +135,61 @@ export function WatchList({
       const lastSeenKey = months[months.length - 1]?.periodKey ?? "";
       const missedLastMonth = !!latestKey && lastSeenKey !== latestKey;
       const isNewThisMonth = months.length === 1 && lastSeenKey === latestKey;
+
+      // === Lightweight ML / anomaly detection on per-client monthly totals ===
+      const totals = months.map((m) => m.total);
+      const n = totals.length;
+      const meanMonthly = n ? totals.reduce((a, b) => a + b, 0) / n : 0;
+      const variance = n > 1 ? totals.reduce((a, b) => a + (b - meanMonthly) ** 2, 0) / (n - 1) : 0;
+      const stdMonthly = Math.sqrt(variance);
+      // z-score per month; mark anomaly when |z| >= 2 (classic outlier rule)
+      let maxAbsZ = 0;
+      for (const m of months) {
+        m.zScore = stdMonthly > 0 ? (m.total - meanMonthly) / stdMonthly : 0;
+        m.isAnomaly = stdMonthly > 0 && Math.abs(m.zScore) >= 2;
+        if (Math.abs(m.zScore) > maxAbsZ) maxAbsZ = Math.abs(m.zScore);
+      }
+      // Trend: simple linear-regression slope on (index, total) — sign tells direction
+      let trend: WatchClient["trend"] = "stable";
+      if (n >= 3) {
+        const xs = totals.map((_, i) => i);
+        const xMean = xs.reduce((a, b) => a + b, 0) / n;
+        const yMean = meanMonthly;
+        const num = xs.reduce((a, x, i) => a + (x - xMean) * (totals[i] - yMean), 0);
+        const den = xs.reduce((a, x) => a + (x - xMean) ** 2, 0);
+        const slope = den ? num / den : 0;
+        // slope as % of mean — ignore noise
+        const rel = meanMonthly > 0 ? slope / meanMonthly : 0;
+        if (rel > 0.15) trend = "rising";
+        else if (rel < -0.15) trend = "falling";
+      }
+      // Composite anomaly score 0-100
+      const missedPenalty = missedLastMonth ? 25 : 0;
+      const newPenalty = isNewThisMonth ? 15 : 0;
+      const zPenalty = Math.min(60, Math.round(maxAbsZ * 20));
+      const trendPenalty = trend === "rising" ? 15 : 0;
+      const anomalyScore = Math.min(100, missedPenalty + newPenalty + zPenalty + trendPenalty);
+      // Plain-English insight
+      const spikeMonth = months.find((m) => m.zScore >= 2);
+      const dropMonth = months.find((m) => m.zScore <= -2);
+      const parts: string[] = [];
+      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${(spikeMonth.zScore).toFixed(1)}σ above their norm)`);
+      if (dropMonth) parts.push(`sharp drop in ${dropMonth.label}`);
+      if (trend === "rising") parts.push(`monthly volume trending up`);
+      if (trend === "falling") parts.push(`monthly volume trending down`);
+      if (missedLastMonth && n >= 2) parts.push(`missed last reporting month after ${n} active month${n === 1 ? "" : "s"}`);
+      if (isNewThisMonth) parts.push(`newly onboarded this month — no behavioural baseline yet`);
+      const mlInsight = parts.length
+        ? `Model: ${parts.join("; ")}.`
+        : `Model: behaviour within normal range (μ ${meanMonthly.toFixed(0)}, σ ${stdMonthly.toFixed(0)}).`;
+
       out.push({
         name, type: e.type, totalZAR: e.totalZAR, totalTxns: e.totalTxns,
         monthsActive: months.length, months, lastSeenKey, missedLastMonth, isNewThisMonth,
+        meanMonthly, stdMonthly, trend, anomalyScore, mlInsight,
       });
     }
-    return out.sort((a, b) => b.totalZAR - a.totalZAR);
+    return out.sort((a, b) => b.anomalyScore - a.anomalyScore || b.totalZAR - a.totalZAR);
   }, [rows, periodMap, latestKey]);
 
   const filtered = clients.filter((c) => {
@@ -219,9 +276,19 @@ export function WatchList({
                       {!c.missedLastMonth && !c.isNewThisMonth && (
                         <Badge className="bg-success text-success-foreground"><CheckCircle2 className="mr-1 h-3 w-3" />Active</Badge>
                       )}
+                      {c.trend === "rising" && <Badge className="bg-warning text-warning-foreground">↑ Trending up</Badge>}
+                      {c.trend === "falling" && <Badge variant="outline">↓ Cooling off</Badge>}
+                      {c.anomalyScore >= 50 && (
+                        <Badge className="bg-destructive/90 text-destructive-foreground animate-pulse">
+                          <Sparkles className="mr-1 h-3 w-3" />ML anomaly {c.anomalyScore}
+                        </Badge>
+                      )}
                     </div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {c.totalTxns} txn · Lifetime <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span> · Active in {c.monthsActive} month{c.monthsActive === 1 ? "" : "s"}
+                      {c.totalTxns} txn · Lifetime <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span> · Active in {c.monthsActive} month{c.monthsActive === 1 ? "" : "s"} · Avg <span className="font-mono">{fmt(c.meanMonthly)}</span>/mo
+                    </div>
+                    <div className="mt-2 rounded-md bg-accent/5 border border-accent/20 px-2.5 py-1.5 text-xs text-foreground/90 italic">
+                      <Sparkles className="inline-block h-3 w-3 mr-1 text-accent" />{c.mlInsight}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -241,15 +308,23 @@ export function WatchList({
                     <span
                       key={m.periodKey}
                       className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
-                        m.periodKey === latestKey ? "bg-primary/15 text-primary border-primary/30" : "bg-muted/60 text-foreground border-border"
+                        m.isAnomaly
+                          ? "bg-destructive/10 text-destructive border-destructive/40"
+                          : m.periodKey === latestKey
+                            ? "bg-primary/15 text-primary border-primary/30"
+                            : "bg-muted/60 text-foreground border-border"
                       }`}
+                      title={m.isAnomaly ? `Anomaly: ${m.zScore.toFixed(2)}σ from this client's normal monthly volume` : undefined}
                     >
                       <span className="font-semibold">{m.label}</span>
                       <span className="opacity-70">· {m.count} txn</span>
                       <span className="font-mono opacity-80">{fmt(m.total)}</span>
+                      {m.isAnomaly && <AlertTriangle className="h-3 w-3" />}
                     </span>
                   ))}
                 </div>
+
+
 
                 {myAssignments.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-2">

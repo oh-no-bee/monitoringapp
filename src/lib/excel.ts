@@ -53,19 +53,22 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
     .map((r) => {
       const d = parseDate(grab(r, "Date", "Txn Date", "Transaction Date"));
       const currency = String(grab(r, "Currency") ?? "").toUpperCase();
-      const totalRaw = Number(grab(r, "Total", "Total ", "Amount") ?? 0) || 0;
-      // ZAR-equivalent column (preferred for non-ZAR rows so all totals are comparable in rand)
+      // PRIMARY source of truth for ZAR value: the "Rand Value (ZAR)" column.
+      // We deliberately ignore the foreign-currency "Total" column to avoid
+      // double-counting / inflated figures.
       const zarEq = Number(
         grab(
           r,
+          "Rand Value (ZAR)", "Rand Value", "Rand Value ZAR",
           "Total (ZAR)", "Total ZAR", "ZAR Total", "ZAR Equivalent",
-          "ZAR Amount", "Rand Equivalent", "Rand Value", "Total Rand",
+          "ZAR Amount", "Rand Equivalent", "Total Rand",
           "Amount (ZAR)", "Amount ZAR", "ZAR",
         ) ?? 0,
       ) || 0;
-      // After this transform `total` is ALWAYS in ZAR. Original currency is preserved.
-      const hasZarEq = !!(currency && currency !== "ZAR" && zarEq > 0);
-      const total = hasZarEq ? zarEq : totalRaw;
+      // Only fall back to the generic Total column when no rand column exists
+      // AND the row is already booked in ZAR (so units match).
+      const totalRaw = Number(grab(r, "Total", "Total ", "Amount") ?? 0) || 0;
+      const total = zarEq > 0 ? zarEq : (currency === "ZAR" ? totalRaw : 0);
       return {
         deal_code:      String(grab(r, "Deal code", "Deal Code") ?? ""),
         txn_date:       d ? d.toISOString().slice(0, 10) : null,

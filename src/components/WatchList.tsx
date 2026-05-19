@@ -21,6 +21,8 @@ interface MonthRow {
   periodKey: string; // YYYY-MM
   total: number;
   count: number;
+  zScore: number; // anomaly score vs client's own history
+  isAnomaly: boolean;
 }
 interface WatchClient {
   name: string;
@@ -32,6 +34,12 @@ interface WatchClient {
   lastSeenKey: string;
   missedLastMonth: boolean;
   isNewThisMonth: boolean;
+  // ML insights
+  meanMonthly: number;
+  stdMonthly: number;
+  trend: "rising" | "falling" | "stable";
+  anomalyScore: number; // 0-100 composite
+  mlInsight: string;
 }
 
 export function WatchList({

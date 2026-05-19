@@ -120,7 +120,7 @@ export function WatchList({
       if (!period) continue;
       const periodKey = `${period.year}-${String(period.month).padStart(2, "0")}`;
       if (!entry.months.has(periodKey)) {
-        entry.months.set(periodKey, { periodId, label: period.period_label, periodKey, total: 0, count: 0 });
+        entry.months.set(periodKey, { periodId, label: period.period_label, periodKey, total: 0, count: 0, zScore: 0, isAnomaly: false });
       }
       const mrow = entry.months.get(periodKey)!;
       const v = Number(r.total) || 0;
@@ -135,12 +135,61 @@ export function WatchList({
       const lastSeenKey = months[months.length - 1]?.periodKey ?? "";
       const missedLastMonth = !!latestKey && lastSeenKey !== latestKey;
       const isNewThisMonth = months.length === 1 && lastSeenKey === latestKey;
+
+      // === Lightweight ML / anomaly detection on per-client monthly totals ===
+      const totals = months.map((m) => m.total);
+      const n = totals.length;
+      const meanMonthly = n ? totals.reduce((a, b) => a + b, 0) / n : 0;
+      const variance = n > 1 ? totals.reduce((a, b) => a + (b - meanMonthly) ** 2, 0) / (n - 1) : 0;
+      const stdMonthly = Math.sqrt(variance);
+      // z-score per month; mark anomaly when |z| >= 2 (classic outlier rule)
+      let maxAbsZ = 0;
+      for (const m of months) {
+        m.zScore = stdMonthly > 0 ? (m.total - meanMonthly) / stdMonthly : 0;
+        m.isAnomaly = stdMonthly > 0 && Math.abs(m.zScore) >= 2;
+        if (Math.abs(m.zScore) > maxAbsZ) maxAbsZ = Math.abs(m.zScore);
+      }
+      // Trend: simple linear-regression slope on (index, total) — sign tells direction
+      let trend: WatchClient["trend"] = "stable";
+      if (n >= 3) {
+        const xs = totals.map((_, i) => i);
+        const xMean = xs.reduce((a, b) => a + b, 0) / n;
+        const yMean = meanMonthly;
+        const num = xs.reduce((a, x, i) => a + (x - xMean) * (totals[i] - yMean), 0);
+        const den = xs.reduce((a, x) => a + (x - xMean) ** 2, 0);
+        const slope = den ? num / den : 0;
+        // slope as % of mean — ignore noise
+        const rel = meanMonthly > 0 ? slope / meanMonthly : 0;
+        if (rel > 0.15) trend = "rising";
+        else if (rel < -0.15) trend = "falling";
+      }
+      // Composite anomaly score 0-100
+      const missedPenalty = missedLastMonth ? 25 : 0;
+      const newPenalty = isNewThisMonth ? 15 : 0;
+      const zPenalty = Math.min(60, Math.round(maxAbsZ * 20));
+      const trendPenalty = trend === "rising" ? 15 : 0;
+      const anomalyScore = Math.min(100, missedPenalty + newPenalty + zPenalty + trendPenalty);
+      // Plain-English insight
+      const spikeMonth = months.find((m) => m.zScore >= 2);
+      const dropMonth = months.find((m) => m.zScore <= -2);
+      const parts: string[] = [];
+      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${(spikeMonth.zScore).toFixed(1)}σ above their norm)`);
+      if (dropMonth) parts.push(`sharp drop in ${dropMonth.label}`);
+      if (trend === "rising") parts.push(`monthly volume trending up`);
+      if (trend === "falling") parts.push(`monthly volume trending down`);
+      if (missedLastMonth && n >= 2) parts.push(`missed last reporting month after ${n} active month${n === 1 ? "" : "s"}`);
+      if (isNewThisMonth) parts.push(`newly onboarded this month — no behavioural baseline yet`);
+      const mlInsight = parts.length
+        ? `Model: ${parts.join("; ")}.`
+        : `Model: behaviour within normal range (μ ${meanMonthly.toFixed(0)}, σ ${stdMonthly.toFixed(0)}).`;
+
       out.push({
         name, type: e.type, totalZAR: e.totalZAR, totalTxns: e.totalTxns,
         monthsActive: months.length, months, lastSeenKey, missedLastMonth, isNewThisMonth,
+        meanMonthly, stdMonthly, trend, anomalyScore, mlInsight,
       });
     }
-    return out.sort((a, b) => b.totalZAR - a.totalZAR);
+    return out.sort((a, b) => b.anomalyScore - a.anomalyScore || b.totalZAR - a.totalZAR);
   }, [rows, periodMap, latestKey]);
 
   const filtered = clients.filter((c) => {

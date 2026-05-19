@@ -159,9 +159,12 @@ export function Dashboard() {
     onSuccess: () => { toast.success("Period removed"); setActivePeriod(null); qc.invalidateQueries({ queryKey: ["periods"] }); },
   });
 
-  const dirTxns = dirFilter === "ALL"
+  const dirTxns = (dirFilter === "ALL"
     ? txns
-    : txns.filter((t) => (t.direction || "").toUpperCase().startsWith(dirFilter));
+    : txns.filter((t) => (t.direction || "").toUpperCase().startsWith(dirFilter))
+  ).filter((t) => currencyFilter === "ALL" || (t.currency || "").toUpperCase() === currencyFilter);
+
+  const availableCurrencies = Array.from(new Set(txns.map((t) => (t.currency || "").toUpperCase()).filter(Boolean))).sort();
 
   const results: ClientResult[] = dirTxns.length ? runRules(dirTxns, settings, customs) : [];
 

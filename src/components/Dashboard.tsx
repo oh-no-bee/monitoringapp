@@ -352,6 +352,15 @@ export function Dashboard() {
                     <SelectItem value="S">Sell only</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
+                  <SelectTrigger className="w-[160px]"><SelectValue placeholder="Currency" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All currencies</SelectItem>
+                    {availableCurrencies.map((c) => (
+                      <SelectItem key={c} value={c}>{c} only</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="flex-1" />
                 <Button variant="outline" size="sm" onClick={() => exportExcel(filtered, periodLabel)} disabled={!filtered.length}>
                   <FileDown className="mr-2 h-4 w-4" />Excel

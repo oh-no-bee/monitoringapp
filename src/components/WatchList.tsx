@@ -276,9 +276,19 @@ export function WatchList({
                       {!c.missedLastMonth && !c.isNewThisMonth && (
                         <Badge className="bg-success text-success-foreground"><CheckCircle2 className="mr-1 h-3 w-3" />Active</Badge>
                       )}
+                      {c.trend === "rising" && <Badge className="bg-warning text-warning-foreground">↑ Trending up</Badge>}
+                      {c.trend === "falling" && <Badge variant="outline">↓ Cooling off</Badge>}
+                      {c.anomalyScore >= 50 && (
+                        <Badge className="bg-destructive/90 text-destructive-foreground animate-pulse">
+                          <Sparkles className="mr-1 h-3 w-3" />ML anomaly {c.anomalyScore}
+                        </Badge>
+                      )}
                     </div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {c.totalTxns} txn · Lifetime <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span> · Active in {c.monthsActive} month{c.monthsActive === 1 ? "" : "s"}
+                      {c.totalTxns} txn · Lifetime <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span> · Active in {c.monthsActive} month{c.monthsActive === 1 ? "" : "s"} · Avg <span className="font-mono">{fmt(c.meanMonthly)}</span>/mo
+                    </div>
+                    <div className="mt-2 rounded-md bg-accent/5 border border-accent/20 px-2.5 py-1.5 text-xs text-foreground/90 italic">
+                      <Sparkles className="inline-block h-3 w-3 mr-1 text-accent" />{c.mlInsight}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -298,15 +308,23 @@ export function WatchList({
                     <span
                       key={m.periodKey}
                       className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
-                        m.periodKey === latestKey ? "bg-primary/15 text-primary border-primary/30" : "bg-muted/60 text-foreground border-border"
+                        m.isAnomaly
+                          ? "bg-destructive/10 text-destructive border-destructive/40"
+                          : m.periodKey === latestKey
+                            ? "bg-primary/15 text-primary border-primary/30"
+                            : "bg-muted/60 text-foreground border-border"
                       }`}
+                      title={m.isAnomaly ? `Anomaly: ${m.zScore.toFixed(2)}σ from this client's normal monthly volume` : undefined}
                     >
                       <span className="font-semibold">{m.label}</span>
                       <span className="opacity-70">· {m.count} txn</span>
                       <span className="font-mono opacity-80">{fmt(m.total)}</span>
+                      {m.isAnomaly && <AlertTriangle className="h-3 w-3" />}
                     </span>
                   ))}
                 </div>
+
+
 
                 {myAssignments.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5 border-t pt-2">

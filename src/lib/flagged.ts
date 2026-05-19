@@ -99,27 +99,16 @@ export function buildFlagged(results: ClientResult[]): FlaggedClient[] {
       const action = recommendedAction(c);
       const ccyList = c.currencies.filter((x) => x && x !== "ZAR");
       const ccyPhrase = ccyList.length
-        ? `across ${ccyList.length} foreign currenc${ccyList.length === 1 ? "y" : "ies"} (${ccyList.slice(0, 5).join(", ")}${ccyList.length > 5 ? "…" : ""}) alongside the local rand book`
-        : "exclusively in South African rand";
-      const reasonStory =
-        reasons.length === 0
-          ? " "
-          : reasons.length === 1
-            ? ` The single concern driving this assessment is that ${lower(reasons[0])} `
-            : ` The picture that emerges is concerning: ${reasons
-                .map((r, i) => (i === reasons.length - 1 ? `and finally ${lower(r)}` : lower(r)))
-                .join("; ")} `;
+        ? `in rand plus ${ccyList.slice(0, 3).join(", ")}${ccyList.length > 3 ? " and others" : ""}`
+        : "in rand";
+      const topReason = reasons[0] ? lower(reasons[0].split(" — ")[0] || reasons[0]) : "unusual activity";
+      const extra = reasons.length > 1 ? ` There ${reasons.length === 2 ? "is one more red flag" : `are ${reasons.length - 1} more red flags`} on the file too.` : "";
 
       const narrative =
-        `${c.clientName}, classified as ${c.clientType || "an unclassified client"}, ` +
-        `moved a total of ${fmtZ(c.totalZAR)} through ${c.txnCount} transaction${c.txnCount === 1 ? "" : "s"} ` +
-        `${ccyPhrase} during the reporting period. ` +
-        `Under FICA and FIC ongoing-monitoring obligations the activity scores ${score} out of 100, ` +
-        `placing the relationship in the ${c.riskLevel.toLowerCase()} risk band.` +
-        reasonStory +
-        `Taken together these patterns are inconsistent with routine retail or commercial behaviour and require deliberate intervention. ` +
-        `The recommended next step is to ${lower(action.replace(/\.$/, ""))}, documenting every step in the client file ` +
-        `so the bank can demonstrate to the FIC and SARB that the ongoing-monitoring obligation has been discharged in good faith.`;
+        `${c.clientName} (${c.clientType || "unclassified"}) moved ${fmtZ(c.totalZAR)} over ${c.txnCount} transaction${c.txnCount === 1 ? "" : "s"} ${ccyPhrase}. ` +
+        `We flagged them because ${topReason}.${extra} ` +
+        `Risk score is ${score}/100 — ${c.riskLevel.toLowerCase()} risk. ` +
+        `Next step: ${lower(action.replace(/\.$/, ""))}.`;
 
       return {
         clientName: c.clientName,

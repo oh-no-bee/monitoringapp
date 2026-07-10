@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Eye, AlertTriangle, CheckCircle2, Plus, Tag, Sparkles } from "lucide-react";
+import { Eye, AlertTriangle, CheckCircle2, Plus, Tag, Sparkles, Flame, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -34,11 +34,17 @@ interface WatchClient {
   lastSeenKey: string;
   missedLastMonth: boolean;
   isNewThisMonth: boolean;
+  // Consistency / watch-trail
+  currentStreak: number;      // consecutive most-recent months active
+  longestStreak: number;
+  missedCount: number;        // periods where client had 0 activity
+  consistencyPct: number;     // monthsActive / total periods (0-100)
+  isConsistent: boolean;      // active in every uploaded period
   // ML insights
   meanMonthly: number;
   stdMonthly: number;
   trend: "rising" | "falling" | "stable";
-  anomalyScore: number; // 0-100 composite
+  anomalyScore: number;
   mlInsight: string;
 }
 
@@ -50,7 +56,7 @@ export function WatchList({
   onOpenTriggers: () => void;
 }) {
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "MISSED" | "NEW">("ALL");
+  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "MISSED" | "NEW" | "CONSISTENT">("ALL");
   const [search, setSearch] = useState("");
 
   // pull all txns for all periods limited to LI/MCPI
@@ -103,11 +109,21 @@ export function WatchList({
     return m;
   }, [periods]);
 
-  // Most recent period in dataset
-  const latestKey = periods
-    .slice()
-    .sort((a, b) => (b.year - a.year) || (b.month - a.month))
-    .map((p) => `${p.year}-${String(p.month).padStart(2, "0")}`)[0];
+  // All uploaded periods sorted chronologically (YYYY-MM)
+  const allPeriodKeys = useMemo(
+    () =>
+      periods
+        .slice()
+        .sort((a, b) => (a.year - b.year) || (a.month - b.month))
+        .map((p) => `${p.year}-${String(p.month).padStart(2, "0")}`),
+    [periods],
+  );
+  const periodByKey = useMemo(() => {
+    const m = new Map<string, Tables<"upload_periods">>();
+    for (const p of periods) m.set(`${p.year}-${String(p.month).padStart(2, "0")}`, p);
+    return m;
+  }, [periods]);
+  const latestKey = allPeriodKeys[allPeriodKeys.length - 1];
 
   const clients: WatchClient[] = useMemo(() => {
     const byClient = new Map<string, { type: string; months: Map<string, MonthRow>; totalZAR: number; totalTxns: number }>();
@@ -136,48 +152,65 @@ export function WatchList({
       const missedLastMonth = !!latestKey && lastSeenKey !== latestKey;
       const isNewThisMonth = months.length === 1 && lastSeenKey === latestKey;
 
-      // === Lightweight ML / anomaly detection on per-client monthly totals ===
+      // === Consistency / streak across ALL uploaded periods ===
+      const activeSet = new Set(months.map((m) => m.periodKey));
+      const totalPeriods = allPeriodKeys.length;
+      const missedCount = totalPeriods - activeSet.size;
+      const consistencyPct = totalPeriods ? Math.round((activeSet.size / totalPeriods) * 100) : 0;
+      const isConsistent = totalPeriods > 1 && activeSet.size === totalPeriods;
+      let longestStreak = 0, currentStreak = 0;
+      let run = 0;
+      for (const k of allPeriodKeys) {
+        if (activeSet.has(k)) { run++; if (run > longestStreak) longestStreak = run; }
+        else run = 0;
+      }
+      // current streak = trailing consecutive months active
+      for (let i = allPeriodKeys.length - 1; i >= 0; i--) {
+        if (activeSet.has(allPeriodKeys[i])) currentStreak++;
+        else break;
+      }
+
+      // === Anomaly detection on per-client monthly totals ===
       const totals = months.map((m) => m.total);
       const n = totals.length;
       const meanMonthly = n ? totals.reduce((a, b) => a + b, 0) / n : 0;
       const variance = n > 1 ? totals.reduce((a, b) => a + (b - meanMonthly) ** 2, 0) / (n - 1) : 0;
       const stdMonthly = Math.sqrt(variance);
-      // z-score per month; mark anomaly when |z| >= 2 (classic outlier rule)
       let maxAbsZ = 0;
       for (const m of months) {
         m.zScore = stdMonthly > 0 ? (m.total - meanMonthly) / stdMonthly : 0;
         m.isAnomaly = stdMonthly > 0 && Math.abs(m.zScore) >= 2;
         if (Math.abs(m.zScore) > maxAbsZ) maxAbsZ = Math.abs(m.zScore);
       }
-      // Trend: simple linear-regression slope on (index, total) — sign tells direction
       let trend: WatchClient["trend"] = "stable";
       if (n >= 3) {
         const xs = totals.map((_, i) => i);
         const xMean = xs.reduce((a, b) => a + b, 0) / n;
-        const yMean = meanMonthly;
-        const num = xs.reduce((a, x, i) => a + (x - xMean) * (totals[i] - yMean), 0);
+        const num = xs.reduce((a, x, i) => a + (x - xMean) * (totals[i] - meanMonthly), 0);
         const den = xs.reduce((a, x) => a + (x - xMean) ** 2, 0);
         const slope = den ? num / den : 0;
-        // slope as % of mean — ignore noise
         const rel = meanMonthly > 0 ? slope / meanMonthly : 0;
         if (rel > 0.15) trend = "rising";
         else if (rel < -0.15) trend = "falling";
       }
-      // Composite anomaly score 0-100
       const missedPenalty = missedLastMonth ? 25 : 0;
       const newPenalty = isNewThisMonth ? 15 : 0;
       const zPenalty = Math.min(60, Math.round(maxAbsZ * 20));
       const trendPenalty = trend === "rising" ? 15 : 0;
-      const anomalyScore = Math.min(100, missedPenalty + newPenalty + zPenalty + trendPenalty);
-      // Plain-English insight
+      const gapPenalty = Math.min(20, missedCount * 5);
+      const anomalyScore = Math.min(100, missedPenalty + newPenalty + zPenalty + trendPenalty + gapPenalty);
+
       const spikeMonth = months.find((m) => m.zScore >= 2);
       const dropMonth = months.find((m) => m.zScore <= -2);
       const parts: string[] = [];
-      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${(spikeMonth.zScore).toFixed(1)}σ above their norm)`);
+      if (isConsistent) parts.push(`transacting every month for ${totalPeriods} consecutive periods — highly consistent`);
+      else if (currentStreak >= 3) parts.push(`on a ${currentStreak}-month active streak`);
+      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${spikeMonth.zScore.toFixed(1)}σ above their norm)`);
       if (dropMonth) parts.push(`sharp drop in ${dropMonth.label}`);
       if (trend === "rising") parts.push(`monthly volume trending up`);
       if (trend === "falling") parts.push(`monthly volume trending down`);
       if (missedLastMonth && n >= 2) parts.push(`missed last reporting month after ${n} active month${n === 1 ? "" : "s"}`);
+      if (missedCount >= 2 && !isNewThisMonth) parts.push(`${missedCount} gap month${missedCount === 1 ? "" : "s"} in trail (${consistencyPct}% consistency)`);
       if (isNewThisMonth) parts.push(`newly onboarded this month — no behavioural baseline yet`);
       const mlInsight = parts.length
         ? `Model: ${parts.join("; ")}.`
@@ -186,17 +219,20 @@ export function WatchList({
       out.push({
         name, type: e.type, totalZAR: e.totalZAR, totalTxns: e.totalTxns,
         monthsActive: months.length, months, lastSeenKey, missedLastMonth, isNewThisMonth,
+        currentStreak, longestStreak, missedCount, consistencyPct, isConsistent,
         meanMonthly, stdMonthly, trend, anomalyScore, mlInsight,
       });
     }
     return out.sort((a, b) => b.anomalyScore - a.anomalyScore || b.totalZAR - a.totalZAR);
-  }, [rows, periodMap, latestKey]);
+  }, [rows, periodMap, latestKey, allPeriodKeys]);
+
 
   const filtered = clients.filter((c) => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filter === "ACTIVE") return !c.missedLastMonth;
     if (filter === "MISSED") return c.missedLastMonth && c.monthsActive > 0;
     if (filter === "NEW") return c.isNewThisMonth;
+    if (filter === "CONSISTENT") return c.isConsistent || c.currentStreak >= 3;
     return true;
   });
 
@@ -205,6 +241,7 @@ export function WatchList({
     active: clients.filter((c) => !c.missedLastMonth).length,
     missed: clients.filter((c) => c.missedLastMonth).length,
     new: clients.filter((c) => c.isNewThisMonth).length,
+    consistent: clients.filter((c) => c.isConsistent || c.currentStreak >= 3).length,
   };
 
   const upsertAssignment = useMutation({
@@ -240,8 +277,9 @@ export function WatchList({
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <FilterChip active={filter === "ALL"} onClick={() => setFilter("ALL")} label="All clients" value={stats.total} icon={Eye} tone="primary" />
+        <FilterChip active={filter === "CONSISTENT"} onClick={() => setFilter("CONSISTENT")} label="Consistent" value={stats.consistent} icon={Flame} tone="accent" />
         <FilterChip active={filter === "ACTIVE"} onClick={() => setFilter("ACTIVE")} label="Active this month" value={stats.active} icon={CheckCircle2} tone="success" />
         <FilterChip active={filter === "MISSED"} onClick={() => setFilter("MISSED")} label="Missed last month" value={stats.missed} icon={AlertTriangle} tone="destructive" pulse={stats.missed > 0} />
         <FilterChip active={filter === "NEW"} onClick={() => setFilter("NEW")} label="New this month" value={stats.new} icon={Sparkles} tone="accent" />
@@ -276,8 +314,18 @@ export function WatchList({
                       {!c.missedLastMonth && !c.isNewThisMonth && (
                         <Badge className="bg-success text-success-foreground"><CheckCircle2 className="mr-1 h-3 w-3" />Active</Badge>
                       )}
-                      {c.trend === "rising" && <Badge className="bg-warning text-warning-foreground">↑ Trending up</Badge>}
-                      {c.trend === "falling" && <Badge variant="outline">↓ Cooling off</Badge>}
+                      {c.isConsistent && (
+                        <Badge className="bg-gradient-to-r from-accent to-accent-glow text-accent-foreground shadow-sm">
+                          <Flame className="mr-1 h-3 w-3" />Consistent · {c.currentStreak}mo streak
+                        </Badge>
+                      )}
+                      {!c.isConsistent && c.currentStreak >= 3 && (
+                        <Badge className="bg-warning text-warning-foreground">
+                          <Flame className="mr-1 h-3 w-3" />{c.currentStreak}-month streak
+                        </Badge>
+                      )}
+                      {c.trend === "rising" && <Badge className="bg-warning text-warning-foreground"><TrendingUp className="mr-1 h-3 w-3" />Trending up</Badge>}
+                      {c.trend === "falling" && <Badge variant="outline"><TrendingDown className="mr-1 h-3 w-3" />Cooling off</Badge>}
                       {c.anomalyScore >= 50 && (
                         <Badge className="bg-destructive/90 text-destructive-foreground animate-pulse">
                           <Sparkles className="mr-1 h-3 w-3" />ML anomaly {c.anomalyScore}
@@ -303,25 +351,64 @@ export function WatchList({
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {c.months.map((m) => (
-                    <span
-                      key={m.periodKey}
-                      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
-                        m.isAnomaly
-                          ? "bg-destructive/10 text-destructive border-destructive/40"
-                          : m.periodKey === latestKey
-                            ? "bg-primary/15 text-primary border-primary/30"
-                            : "bg-muted/60 text-foreground border-border"
-                      }`}
-                      title={m.isAnomaly ? `Anomaly: ${m.zScore.toFixed(2)}σ from this client's normal monthly volume` : undefined}
-                    >
-                      <span className="font-semibold">{m.label}</span>
-                      <span className="opacity-70">· {m.count} txn</span>
-                      <span className="font-mono opacity-80">{fmt(m.total)}</span>
-                      {m.isAnomaly && <AlertTriangle className="h-3 w-3" />}
-                    </span>
-                  ))}
+                {/* Watch trail — every uploaded period as a dot; active vs missed vs anomaly */}
+                <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <Activity className="h-3.5 w-3.5" /> Watch trail
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {c.consistencyPct}% consistency · streak {c.currentStreak}/{allPeriodKeys.length} · longest {c.longestStreak}
+                      {c.missedCount > 0 && <span className="text-destructive"> · {c.missedCount} gap{c.missedCount === 1 ? "" : "s"}</span>}
+                    </div>
+                  </div>
+                  {/* Consistency bar */}
+                  <div className="h-1.5 w-full bg-background rounded-full overflow-hidden mb-3">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${c.consistencyPct}%`,
+                        background: c.consistencyPct >= 80
+                          ? "var(--gradient-accent)"
+                          : c.consistencyPct >= 50
+                            ? "hsl(var(--warning))"
+                            : "hsl(var(--destructive))",
+                      }}
+                    />
+                  </div>
+                  {/* Timeline dots — one per uploaded period */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {allPeriodKeys.map((pk) => {
+                      const month = c.months.find((m) => m.periodKey === pk);
+                      const period = periodByKey.get(pk);
+                      const shortLabel = period ? period.period_label.split(" ")[0].slice(0, 3) : pk.slice(5);
+                      const active = !!month;
+                      const anomaly = month?.isAnomaly;
+                      const isLatest = pk === latestKey;
+                      const tone = !active
+                        ? "bg-destructive/10 text-destructive/70 border-destructive/30 border-dashed"
+                        : anomaly
+                          ? "bg-destructive/15 text-destructive border-destructive/50 shadow-[0_0_0_2px_hsl(var(--destructive)/0.15)]"
+                          : isLatest
+                            ? "bg-gradient-to-br from-primary to-primary-glow text-primary-foreground border-primary shadow-md"
+                            : "bg-success/10 text-success-foreground border-success/40";
+                      return (
+                        <div
+                          key={pk}
+                          className={`group relative flex flex-col items-center rounded-md px-2 py-1 text-[10px] font-medium border transition-all duration-300 hover:-translate-y-0.5 hover:scale-105 ${tone}`}
+                          title={active
+                            ? `${period?.period_label}: ${month!.count} txn · ${fmt(month!.total)}${anomaly ? ` · anomaly ${month!.zScore.toFixed(2)}σ` : ""}`
+                            : `${period?.period_label}: no activity`}
+                        >
+                          <span className="uppercase tracking-wider opacity-80">{shortLabel}</span>
+                          <span className="font-semibold text-[11px] leading-none mt-0.5">
+                            {active ? month!.count : "—"}
+                          </span>
+                          {anomaly && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive animate-ping" />}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
 

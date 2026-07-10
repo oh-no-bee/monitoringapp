@@ -34,11 +34,17 @@ interface WatchClient {
   lastSeenKey: string;
   missedLastMonth: boolean;
   isNewThisMonth: boolean;
+  // Consistency / watch-trail
+  currentStreak: number;      // consecutive most-recent months active
+  longestStreak: number;
+  missedCount: number;        // periods where client had 0 activity
+  consistencyPct: number;     // monthsActive / total periods (0-100)
+  isConsistent: boolean;      // active in every uploaded period
   // ML insights
   meanMonthly: number;
   stdMonthly: number;
   trend: "rising" | "falling" | "stable";
-  anomalyScore: number; // 0-100 composite
+  anomalyScore: number;
   mlInsight: string;
 }
 

@@ -93,8 +93,15 @@ export function FlaggedClients({
           {filtered.map((c, idx) => (
             <Card
               key={c.clientName}
-              className="p-5 border-l-4 animate-fade-in transition-all duration-300 hover:shadow-[var(--shadow-elegant)] hover:-translate-y-0.5"
+              className="relative overflow-hidden p-5 border-l-4 animate-fade-in transition-all duration-300 hover-lift"
               style={{
+                borderLeftColor: c.riskLevel === "Critical" ? "hsl(var(--destructive))" : "hsl(var(--accent))",
+                animationDelay: `${Math.min(idx * 40, 400)}ms`,
+              }}
+            >
+              {c.riskLevel === "Critical" && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-destructive to-transparent animate-shimmer" />
+              )}
                 borderLeftColor: c.riskLevel === "Critical" ? "hsl(var(--destructive))" : "hsl(var(--accent))",
                 animationDelay: `${Math.min(idx * 40, 400)}ms`,
               }}

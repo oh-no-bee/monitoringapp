@@ -109,11 +109,21 @@ export function WatchList({
     return m;
   }, [periods]);
 
-  // Most recent period in dataset
-  const latestKey = periods
-    .slice()
-    .sort((a, b) => (b.year - a.year) || (b.month - a.month))
-    .map((p) => `${p.year}-${String(p.month).padStart(2, "0")}`)[0];
+  // All uploaded periods sorted chronologically (YYYY-MM)
+  const allPeriodKeys = useMemo(
+    () =>
+      periods
+        .slice()
+        .sort((a, b) => (a.year - b.year) || (a.month - b.month))
+        .map((p) => `${p.year}-${String(p.month).padStart(2, "0")}`),
+    [periods],
+  );
+  const periodByKey = useMemo(() => {
+    const m = new Map<string, Tables<"upload_periods">>();
+    for (const p of periods) m.set(`${p.year}-${String(p.month).padStart(2, "0")}`, p);
+    return m;
+  }, [periods]);
+  const latestKey = allPeriodKeys[allPeriodKeys.length - 1];
 
   const clients: WatchClient[] = useMemo(() => {
     const byClient = new Map<string, { type: string; months: Map<string, MonthRow>; totalZAR: number; totalTxns: number }>();
@@ -142,48 +152,65 @@ export function WatchList({
       const missedLastMonth = !!latestKey && lastSeenKey !== latestKey;
       const isNewThisMonth = months.length === 1 && lastSeenKey === latestKey;
 
-      // === Lightweight ML / anomaly detection on per-client monthly totals ===
+      // === Consistency / streak across ALL uploaded periods ===
+      const activeSet = new Set(months.map((m) => m.periodKey));
+      const totalPeriods = allPeriodKeys.length;
+      const missedCount = totalPeriods - activeSet.size;
+      const consistencyPct = totalPeriods ? Math.round((activeSet.size / totalPeriods) * 100) : 0;
+      const isConsistent = totalPeriods > 1 && activeSet.size === totalPeriods;
+      let longestStreak = 0, currentStreak = 0;
+      let run = 0;
+      for (const k of allPeriodKeys) {
+        if (activeSet.has(k)) { run++; if (run > longestStreak) longestStreak = run; }
+        else run = 0;
+      }
+      // current streak = trailing consecutive months active
+      for (let i = allPeriodKeys.length - 1; i >= 0; i--) {
+        if (activeSet.has(allPeriodKeys[i])) currentStreak++;
+        else break;
+      }
+
+      // === Anomaly detection on per-client monthly totals ===
       const totals = months.map((m) => m.total);
       const n = totals.length;
       const meanMonthly = n ? totals.reduce((a, b) => a + b, 0) / n : 0;
       const variance = n > 1 ? totals.reduce((a, b) => a + (b - meanMonthly) ** 2, 0) / (n - 1) : 0;
       const stdMonthly = Math.sqrt(variance);
-      // z-score per month; mark anomaly when |z| >= 2 (classic outlier rule)
       let maxAbsZ = 0;
       for (const m of months) {
         m.zScore = stdMonthly > 0 ? (m.total - meanMonthly) / stdMonthly : 0;
         m.isAnomaly = stdMonthly > 0 && Math.abs(m.zScore) >= 2;
         if (Math.abs(m.zScore) > maxAbsZ) maxAbsZ = Math.abs(m.zScore);
       }
-      // Trend: simple linear-regression slope on (index, total) — sign tells direction
       let trend: WatchClient["trend"] = "stable";
       if (n >= 3) {
         const xs = totals.map((_, i) => i);
         const xMean = xs.reduce((a, b) => a + b, 0) / n;
-        const yMean = meanMonthly;
-        const num = xs.reduce((a, x, i) => a + (x - xMean) * (totals[i] - yMean), 0);
+        const num = xs.reduce((a, x, i) => a + (x - xMean) * (totals[i] - meanMonthly), 0);
         const den = xs.reduce((a, x) => a + (x - xMean) ** 2, 0);
         const slope = den ? num / den : 0;
-        // slope as % of mean — ignore noise
         const rel = meanMonthly > 0 ? slope / meanMonthly : 0;
         if (rel > 0.15) trend = "rising";
         else if (rel < -0.15) trend = "falling";
       }
-      // Composite anomaly score 0-100
       const missedPenalty = missedLastMonth ? 25 : 0;
       const newPenalty = isNewThisMonth ? 15 : 0;
       const zPenalty = Math.min(60, Math.round(maxAbsZ * 20));
       const trendPenalty = trend === "rising" ? 15 : 0;
-      const anomalyScore = Math.min(100, missedPenalty + newPenalty + zPenalty + trendPenalty);
-      // Plain-English insight
+      const gapPenalty = Math.min(20, missedCount * 5);
+      const anomalyScore = Math.min(100, missedPenalty + newPenalty + zPenalty + trendPenalty + gapPenalty);
+
       const spikeMonth = months.find((m) => m.zScore >= 2);
       const dropMonth = months.find((m) => m.zScore <= -2);
       const parts: string[] = [];
-      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${(spikeMonth.zScore).toFixed(1)}σ above their norm)`);
+      if (isConsistent) parts.push(`transacting every month for ${totalPeriods} consecutive periods — highly consistent`);
+      else if (currentStreak >= 3) parts.push(`on a ${currentStreak}-month active streak`);
+      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${spikeMonth.zScore.toFixed(1)}σ above their norm)`);
       if (dropMonth) parts.push(`sharp drop in ${dropMonth.label}`);
       if (trend === "rising") parts.push(`monthly volume trending up`);
       if (trend === "falling") parts.push(`monthly volume trending down`);
       if (missedLastMonth && n >= 2) parts.push(`missed last reporting month after ${n} active month${n === 1 ? "" : "s"}`);
+      if (missedCount >= 2 && !isNewThisMonth) parts.push(`${missedCount} gap month${missedCount === 1 ? "" : "s"} in trail (${consistencyPct}% consistency)`);
       if (isNewThisMonth) parts.push(`newly onboarded this month — no behavioural baseline yet`);
       const mlInsight = parts.length
         ? `Model: ${parts.join("; ")}.`
@@ -192,11 +219,13 @@ export function WatchList({
       out.push({
         name, type: e.type, totalZAR: e.totalZAR, totalTxns: e.totalTxns,
         monthsActive: months.length, months, lastSeenKey, missedLastMonth, isNewThisMonth,
+        currentStreak, longestStreak, missedCount, consistencyPct, isConsistent,
         meanMonthly, stdMonthly, trend, anomalyScore, mlInsight,
       });
     }
     return out.sort((a, b) => b.anomalyScore - a.anomalyScore || b.totalZAR - a.totalZAR);
-  }, [rows, periodMap, latestKey]);
+  }, [rows, periodMap, latestKey, allPeriodKeys]);
+
 
   const filtered = clients.filter((c) => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;

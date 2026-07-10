@@ -277,8 +277,9 @@ export function WatchList({
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <FilterChip active={filter === "ALL"} onClick={() => setFilter("ALL")} label="All clients" value={stats.total} icon={Eye} tone="primary" />
+        <FilterChip active={filter === "CONSISTENT"} onClick={() => setFilter("CONSISTENT")} label="Consistent" value={stats.consistent} icon={Flame} tone="accent" />
         <FilterChip active={filter === "ACTIVE"} onClick={() => setFilter("ACTIVE")} label="Active this month" value={stats.active} icon={CheckCircle2} tone="success" />
         <FilterChip active={filter === "MISSED"} onClick={() => setFilter("MISSED")} label="Missed last month" value={stats.missed} icon={AlertTriangle} tone="destructive" pulse={stats.missed > 0} />
         <FilterChip active={filter === "NEW"} onClick={() => setFilter("NEW")} label="New this month" value={stats.new} icon={Sparkles} tone="accent" />

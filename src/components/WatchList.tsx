@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Eye, AlertTriangle, CheckCircle2, Plus, Tag, Sparkles } from "lucide-react";
+import { Eye, AlertTriangle, CheckCircle2, Plus, Tag, Sparkles, Flame, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 

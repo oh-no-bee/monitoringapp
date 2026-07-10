@@ -351,25 +351,64 @@ export function WatchList({
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {c.months.map((m) => (
-                    <span
-                      key={m.periodKey}
-                      className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
-                        m.isAnomaly
-                          ? "bg-destructive/10 text-destructive border-destructive/40"
-                          : m.periodKey === latestKey
-                            ? "bg-primary/15 text-primary border-primary/30"
-                            : "bg-muted/60 text-foreground border-border"
-                      }`}
-                      title={m.isAnomaly ? `Anomaly: ${m.zScore.toFixed(2)}σ from this client's normal monthly volume` : undefined}
-                    >
-                      <span className="font-semibold">{m.label}</span>
-                      <span className="opacity-70">· {m.count} txn</span>
-                      <span className="font-mono opacity-80">{fmt(m.total)}</span>
-                      {m.isAnomaly && <AlertTriangle className="h-3 w-3" />}
-                    </span>
-                  ))}
+                {/* Watch trail — every uploaded period as a dot; active vs missed vs anomaly */}
+                <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <Activity className="h-3.5 w-3.5" /> Watch trail
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {c.consistencyPct}% consistency · streak {c.currentStreak}/{allPeriodKeys.length} · longest {c.longestStreak}
+                      {c.missedCount > 0 && <span className="text-destructive"> · {c.missedCount} gap{c.missedCount === 1 ? "" : "s"}</span>}
+                    </div>
+                  </div>
+                  {/* Consistency bar */}
+                  <div className="h-1.5 w-full bg-background rounded-full overflow-hidden mb-3">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${c.consistencyPct}%`,
+                        background: c.consistencyPct >= 80
+                          ? "var(--gradient-accent)"
+                          : c.consistencyPct >= 50
+                            ? "hsl(var(--warning))"
+                            : "hsl(var(--destructive))",
+                      }}
+                    />
+                  </div>
+                  {/* Timeline dots — one per uploaded period */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {allPeriodKeys.map((pk) => {
+                      const month = c.months.find((m) => m.periodKey === pk);
+                      const period = periodByKey.get(pk);
+                      const shortLabel = period ? period.period_label.split(" ")[0].slice(0, 3) : pk.slice(5);
+                      const active = !!month;
+                      const anomaly = month?.isAnomaly;
+                      const isLatest = pk === latestKey;
+                      const tone = !active
+                        ? "bg-destructive/10 text-destructive/70 border-destructive/30 border-dashed"
+                        : anomaly
+                          ? "bg-destructive/15 text-destructive border-destructive/50 shadow-[0_0_0_2px_hsl(var(--destructive)/0.15)]"
+                          : isLatest
+                            ? "bg-gradient-to-br from-primary to-primary-glow text-primary-foreground border-primary shadow-md"
+                            : "bg-success/10 text-success-foreground border-success/40";
+                      return (
+                        <div
+                          key={pk}
+                          className={`group relative flex flex-col items-center rounded-md px-2 py-1 text-[10px] font-medium border transition-all duration-300 hover:-translate-y-0.5 hover:scale-105 ${tone}`}
+                          title={active
+                            ? `${period?.period_label}: ${month!.count} txn · ${fmt(month!.total)}${anomaly ? ` · anomaly ${month!.zScore.toFixed(2)}σ` : ""}`
+                            : `${period?.period_label}: no activity`}
+                        >
+                          <span className="uppercase tracking-wider opacity-80">{shortLabel}</span>
+                          <span className="font-semibold text-[11px] leading-none mt-0.5">
+                            {active ? month!.count : "—"}
+                          </span>
+                          {anomaly && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive animate-ping" />}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
 

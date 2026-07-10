@@ -56,7 +56,7 @@ export function WatchList({
   onOpenTriggers: () => void;
 }) {
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "MISSED" | "NEW">("ALL");
+  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "MISSED" | "NEW" | "CONSISTENT">("ALL");
   const [search, setSearch] = useState("");
 
   // pull all txns for all periods limited to LI/MCPI

@@ -232,6 +232,7 @@ export function WatchList({
     if (filter === "ACTIVE") return !c.missedLastMonth;
     if (filter === "MISSED") return c.missedLastMonth && c.monthsActive > 0;
     if (filter === "NEW") return c.isNewThisMonth;
+    if (filter === "CONSISTENT") return c.isConsistent || c.currentStreak >= 3;
     return true;
   });
 
@@ -240,6 +241,7 @@ export function WatchList({
     active: clients.filter((c) => !c.missedLastMonth).length,
     missed: clients.filter((c) => c.missedLastMonth).length,
     new: clients.filter((c) => c.isNewThisMonth).length,
+    consistent: clients.filter((c) => c.isConsistent || c.currentStreak >= 3).length,
   };
 
   const upsertAssignment = useMutation({

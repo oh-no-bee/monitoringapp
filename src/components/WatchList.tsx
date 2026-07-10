@@ -314,8 +314,18 @@ export function WatchList({
                       {!c.missedLastMonth && !c.isNewThisMonth && (
                         <Badge className="bg-success text-success-foreground"><CheckCircle2 className="mr-1 h-3 w-3" />Active</Badge>
                       )}
-                      {c.trend === "rising" && <Badge className="bg-warning text-warning-foreground">↑ Trending up</Badge>}
-                      {c.trend === "falling" && <Badge variant="outline">↓ Cooling off</Badge>}
+                      {c.isConsistent && (
+                        <Badge className="bg-gradient-to-r from-accent to-accent-glow text-accent-foreground shadow-sm">
+                          <Flame className="mr-1 h-3 w-3" />Consistent · {c.currentStreak}mo streak
+                        </Badge>
+                      )}
+                      {!c.isConsistent && c.currentStreak >= 3 && (
+                        <Badge className="bg-warning text-warning-foreground">
+                          <Flame className="mr-1 h-3 w-3" />{c.currentStreak}-month streak
+                        </Badge>
+                      )}
+                      {c.trend === "rising" && <Badge className="bg-warning text-warning-foreground"><TrendingUp className="mr-1 h-3 w-3" />Trending up</Badge>}
+                      {c.trend === "falling" && <Badge variant="outline"><TrendingDown className="mr-1 h-3 w-3" />Cooling off</Badge>}
                       {c.anomalyScore >= 50 && (
                         <Badge className="bg-destructive/90 text-destructive-foreground animate-pulse">
                           <Sparkles className="mr-1 h-3 w-3" />ML anomaly {c.anomalyScore}

@@ -46,6 +46,7 @@ interface WatchClient {
   trend: "rising" | "falling" | "stable";
   anomalyScore: number;
   mlInsight: string;
+  mlBullets: string[];
 }
 
 export function WatchList({

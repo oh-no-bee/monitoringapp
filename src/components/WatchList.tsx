@@ -337,9 +337,14 @@ export function WatchList({
                     <div className="mt-1 text-sm text-muted-foreground">
                       {c.totalTxns} txn · Lifetime <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span> · Active in {c.monthsActive} month{c.monthsActive === 1 ? "" : "s"} · Avg <span className="font-mono">{fmt(c.meanMonthly)}</span>/mo
                     </div>
-                    <div className="mt-2 rounded-md bg-accent/5 border border-accent/20 px-2.5 py-1.5 text-xs text-foreground/90 italic">
-                      <Sparkles className="inline-block h-3 w-3 mr-1 text-accent" />{c.mlInsight}
-                    </div>
+                    <ul className="mt-2 rounded-md bg-accent/5 border border-accent/20 px-2.5 py-2 text-xs text-foreground/90 space-y-1">
+                      {c.mlBullets.map((b, i) => (
+                        <li key={i} className="flex gap-1.5">
+                          <Sparkles className="h-3 w-3 mt-0.5 flex-shrink-0 text-accent" />
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   <div className="flex items-center gap-2">
                     <AssignTriggerDialog

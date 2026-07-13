@@ -46,6 +46,7 @@ interface WatchClient {
   trend: "rising" | "falling" | "stable";
   anomalyScore: number;
   mlInsight: string;
+  mlBullets: string[];
 }
 
 export function WatchList({
@@ -203,24 +204,25 @@ export function WatchList({
       const spikeMonth = months.find((m) => m.zScore >= 2);
       const dropMonth = months.find((m) => m.zScore <= -2);
       const parts: string[] = [];
-      if (isConsistent) parts.push(`transacting every month for ${totalPeriods} consecutive periods — highly consistent`);
-      else if (currentStreak >= 3) parts.push(`on a ${currentStreak}-month active streak`);
-      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${spikeMonth.zScore.toFixed(1)}σ above their norm)`);
-      if (dropMonth) parts.push(`sharp drop in ${dropMonth.label}`);
-      if (trend === "rising") parts.push(`monthly volume trending up`);
-      if (trend === "falling") parts.push(`monthly volume trending down`);
-      if (missedLastMonth && n >= 2) parts.push(`missed last reporting month after ${n} active month${n === 1 ? "" : "s"}`);
-      if (missedCount >= 2 && !isNewThisMonth) parts.push(`${missedCount} gap month${missedCount === 1 ? "" : "s"} in trail (${consistencyPct}% consistency)`);
-      if (isNewThisMonth) parts.push(`newly onboarded this month — no behavioural baseline yet`);
-      const mlInsight = parts.length
-        ? `Model: ${parts.join("; ")}.`
-        : `Model: behaviour within normal range (μ ${meanMonthly.toFixed(0)}, σ ${stdMonthly.toFixed(0)}).`;
+      if (isConsistent) parts.push(`Transacting every month for ${totalPeriods} consecutive periods — highly consistent.`);
+      else if (currentStreak >= 3) parts.push(`On a ${currentStreak}-month active streak.`);
+      if (spikeMonth) parts.push(`Unusual spike in ${spikeMonth.label} (${spikeMonth.zScore.toFixed(1)}σ above their norm).`);
+      if (dropMonth) parts.push(`Sharp drop in ${dropMonth.label}.`);
+      if (trend === "rising") parts.push(`Monthly volume trending up.`);
+      if (trend === "falling") parts.push(`Monthly volume trending down.`);
+      if (missedLastMonth && n >= 2) parts.push(`Missed last reporting month after ${n} active month${n === 1 ? "" : "s"}.`);
+      if (missedCount >= 2 && !isNewThisMonth) parts.push(`${missedCount} gap month${missedCount === 1 ? "" : "s"} in trail (${consistencyPct}% consistency).`);
+      if (isNewThisMonth) parts.push(`Newly onboarded this month — no behavioural baseline yet.`);
+      const mlBullets = parts.length
+        ? parts
+        : [`Behaviour within normal range (μ ${fmt(meanMonthly)}, σ ${fmt(stdMonthly)}).`];
+      const mlInsight = mlBullets.join(" ");
 
       out.push({
         name, type: e.type, totalZAR: e.totalZAR, totalTxns: e.totalTxns,
         monthsActive: months.length, months, lastSeenKey, missedLastMonth, isNewThisMonth,
         currentStreak, longestStreak, missedCount, consistencyPct, isConsistent,
-        meanMonthly, stdMonthly, trend, anomalyScore, mlInsight,
+        meanMonthly, stdMonthly, trend, anomalyScore, mlInsight, mlBullets,
       });
     }
     return out.sort((a, b) => b.anomalyScore - a.anomalyScore || b.totalZAR - a.totalZAR);
@@ -335,9 +337,14 @@ export function WatchList({
                     <div className="mt-1 text-sm text-muted-foreground">
                       {c.totalTxns} txn · Lifetime <span className="font-mono font-semibold text-foreground">{fmt(c.totalZAR)}</span> · Active in {c.monthsActive} month{c.monthsActive === 1 ? "" : "s"} · Avg <span className="font-mono">{fmt(c.meanMonthly)}</span>/mo
                     </div>
-                    <div className="mt-2 rounded-md bg-accent/5 border border-accent/20 px-2.5 py-1.5 text-xs text-foreground/90 italic">
-                      <Sparkles className="inline-block h-3 w-3 mr-1 text-accent" />{c.mlInsight}
-                    </div>
+                    <ul className="mt-2 rounded-md bg-accent/5 border border-accent/20 px-2.5 py-2 text-xs text-foreground/90 space-y-1">
+                      {c.mlBullets.map((b, i) => (
+                        <li key={i} className="flex gap-1.5">
+                          <Sparkles className="h-3 w-3 mt-0.5 flex-shrink-0 text-accent" />
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   <div className="flex items-center gap-2">
                     <AssignTriggerDialog

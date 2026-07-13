@@ -127,10 +127,14 @@ export function FlaggedClients({
                 </div>
               </div>
 
-              <p className="mt-3 text-[15px] leading-relaxed bg-muted/40 rounded-md p-4 border italic">
-                <AlertTriangle className="inline h-4 w-4 mr-1 text-accent -mt-0.5" />
-                {c.narrative}
-              </p>
+              <ul className="mt-3 space-y-1.5 bg-muted/40 rounded-md p-4 border text-[14px] leading-relaxed">
+                {c.bullets.map((b, i) => (
+                  <li key={i} className="flex gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-accent" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {c.triggers.map((t) => (

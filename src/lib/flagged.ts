@@ -13,7 +13,8 @@ export interface FlaggedClient {
   riskScore: number; // 0-100
   triggers: ClientResult["triggers"];
   reasons: string[];        // bullet points (plain English, AML/FIC framed)
-  narrative: string;        // single-paragraph executive summary
+  bullets: string[];        // direct, neutral bullet points for the summary card
+  narrative: string;        // joined bullet string (kept for CSV export)
   recommendedAction: string;
 }
 

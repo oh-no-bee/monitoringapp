@@ -204,24 +204,25 @@ export function WatchList({
       const spikeMonth = months.find((m) => m.zScore >= 2);
       const dropMonth = months.find((m) => m.zScore <= -2);
       const parts: string[] = [];
-      if (isConsistent) parts.push(`transacting every month for ${totalPeriods} consecutive periods — highly consistent`);
-      else if (currentStreak >= 3) parts.push(`on a ${currentStreak}-month active streak`);
-      if (spikeMonth) parts.push(`unusual spike in ${spikeMonth.label} (${spikeMonth.zScore.toFixed(1)}σ above their norm)`);
-      if (dropMonth) parts.push(`sharp drop in ${dropMonth.label}`);
-      if (trend === "rising") parts.push(`monthly volume trending up`);
-      if (trend === "falling") parts.push(`monthly volume trending down`);
-      if (missedLastMonth && n >= 2) parts.push(`missed last reporting month after ${n} active month${n === 1 ? "" : "s"}`);
-      if (missedCount >= 2 && !isNewThisMonth) parts.push(`${missedCount} gap month${missedCount === 1 ? "" : "s"} in trail (${consistencyPct}% consistency)`);
-      if (isNewThisMonth) parts.push(`newly onboarded this month — no behavioural baseline yet`);
-      const mlInsight = parts.length
-        ? `Model: ${parts.join("; ")}.`
-        : `Model: behaviour within normal range (μ ${meanMonthly.toFixed(0)}, σ ${stdMonthly.toFixed(0)}).`;
+      if (isConsistent) parts.push(`Transacting every month for ${totalPeriods} consecutive periods — highly consistent.`);
+      else if (currentStreak >= 3) parts.push(`On a ${currentStreak}-month active streak.`);
+      if (spikeMonth) parts.push(`Unusual spike in ${spikeMonth.label} (${spikeMonth.zScore.toFixed(1)}σ above their norm).`);
+      if (dropMonth) parts.push(`Sharp drop in ${dropMonth.label}.`);
+      if (trend === "rising") parts.push(`Monthly volume trending up.`);
+      if (trend === "falling") parts.push(`Monthly volume trending down.`);
+      if (missedLastMonth && n >= 2) parts.push(`Missed last reporting month after ${n} active month${n === 1 ? "" : "s"}.`);
+      if (missedCount >= 2 && !isNewThisMonth) parts.push(`${missedCount} gap month${missedCount === 1 ? "" : "s"} in trail (${consistencyPct}% consistency).`);
+      if (isNewThisMonth) parts.push(`Newly onboarded this month — no behavioural baseline yet.`);
+      const mlBullets = parts.length
+        ? parts
+        : [`Behaviour within normal range (μ ${fmt(meanMonthly)}, σ ${fmt(stdMonthly)}).`];
+      const mlInsight = mlBullets.join(" ");
 
       out.push({
         name, type: e.type, totalZAR: e.totalZAR, totalTxns: e.totalTxns,
         monthsActive: months.length, months, lastSeenKey, missedLastMonth, isNewThisMonth,
         currentStreak, longestStreak, missedCount, consistencyPct, isConsistent,
-        meanMonthly, stdMonthly, trend, anomalyScore, mlInsight,
+        meanMonthly, stdMonthly, trend, anomalyScore, mlInsight, mlBullets,
       });
     }
     return out.sort((a, b) => b.anomalyScore - a.anomalyScore || b.totalZAR - a.totalZAR);

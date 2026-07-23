@@ -40,10 +40,13 @@ function thr(settings: TriggerSetting[], key: string, fallback: number) {
 }
 
 export function runRules(
-  txns: Txn[],
+  rawTxns: Txn[],
   settings: TriggerSetting[],
   customs: CustomTrigger[],
 ): ClientResult[] {
+  // Every Deal Number is a single forex transaction. Collapse duplicate legs
+  // (e.g. matching CASH foreign-currency row) so totals aren't double-counted.
+  const txns = dedupeByDeal(rawTxns);
   // Group by client
   const byClient = new Map<string, Txn[]>();
   for (const t of txns) {

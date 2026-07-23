@@ -1,5 +1,6 @@
 // Rules engine: takes transactions + trigger settings + custom triggers and returns clients with risk
 import type { Tables } from "@/integrations/supabase/types";
+import { dedupeByDeal } from "./dedupe";
 
 export type Txn = Tables<"transactions">;
 export type TriggerSetting = Tables<"trigger_settings">;

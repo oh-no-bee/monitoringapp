@@ -129,7 +129,16 @@ export function WatchList({
 
   const clients: WatchClient[] = useMemo(() => {
     const byClient = new Map<string, { type: string; months: Map<string, MonthRow>; totalZAR: number; totalTxns: number }>();
+    // Dedupe per period so each Deal Number is counted once within its upload.
+    const byPeriod = new Map<string, typeof rows>();
     for (const r of rows) {
+      const pid = r.period_id || "";
+      if (!byPeriod.has(pid)) byPeriod.set(pid, []);
+      byPeriod.get(pid)!.push(r);
+    }
+    const deduped: typeof rows = [];
+    for (const list of byPeriod.values()) deduped.push(...dedupeByDeal(list));
+    for (const r of deduped) {
       const name = r.client_name || "(unknown)";
       if (!byClient.has(name)) byClient.set(name, { type: (r.client_type || "").toUpperCase(), months: new Map(), totalZAR: 0, totalTxns: 0 });
       const entry = byClient.get(name)!;

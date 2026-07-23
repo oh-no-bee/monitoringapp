@@ -1,5 +1,6 @@
 // Rules engine: takes transactions + trigger settings + custom triggers and returns clients with risk
 import type { Tables } from "@/integrations/supabase/types";
+import { dedupeByDeal } from "./dedupe";
 
 export type Txn = Tables<"transactions">;
 export type TriggerSetting = Tables<"trigger_settings">;
@@ -39,10 +40,13 @@ function thr(settings: TriggerSetting[], key: string, fallback: number) {
 }
 
 export function runRules(
-  txns: Txn[],
+  rawTxns: Txn[],
   settings: TriggerSetting[],
   customs: CustomTrigger[],
 ): ClientResult[] {
+  // Every Deal Number is a single forex transaction. Collapse duplicate legs
+  // (e.g. matching CASH foreign-currency row) so totals aren't double-counted.
+  const txns = dedupeByDeal(rawTxns);
   // Group by client
   const byClient = new Map<string, Txn[]>();
   for (const t of txns) {

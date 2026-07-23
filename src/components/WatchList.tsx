@@ -69,7 +69,7 @@ export function WatchList({
       while (true) {
         const { data, error } = await supabase
           .from("transactions")
-          .select("client_name,client_type,total,currency,txn_date,period_id")
+          .select("client_name,client_type,total,currency,txn_date,period_id,deal_code,product,direction")
           .in("client_type", ["LI", "MCPI"])
           .range(from, from + step - 1);
         if (error) throw error;

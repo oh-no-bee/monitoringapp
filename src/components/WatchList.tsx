@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Eye, AlertTriangle, CheckCircle2, Plus, Tag, Sparkles, Flame, TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
+import { dedupeByDeal } from "@/lib/dedupe";
 
 const fmt = (n: number) =>
   "R" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

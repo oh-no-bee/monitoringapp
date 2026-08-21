@@ -140,11 +140,16 @@ export function Dashboard() {
         }
         created.push({ id: periodId!, label: period.periodLabel, count: period.rows.length });
       }
-      return created;
+      return { created, zarSource: parsed.zarSource, zarFallback: parsed.zarFallback };
     },
-    onSuccess: (created) => {
+    onSuccess: ({ created, zarSource, zarFallback }) => {
       const summary = created.map((c) => `${c.label} (${c.count.toLocaleString()})`).join(", ");
       toast.success(`Loaded ${created.length} period${created.length > 1 ? "s" : ""}: ${summary}`);
+      if (zarFallback) {
+        toast.warning(`No Rand Value (ZAR) column found — values were taken from "${zarSource}" as-is.`);
+      } else {
+        toast.info(`ZAR values read from column "${zarSource}".`);
+      }
       if (created.length) setActivePeriod(created[created.length - 1].id);
       qc.invalidateQueries();
     },

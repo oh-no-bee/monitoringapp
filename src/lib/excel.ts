@@ -12,6 +12,10 @@ export interface ParsedPeriod {
 export interface ParsedUpload {
   periods: ParsedPeriod[];
   totalRows: number;
+  /** Which column the ZAR value was taken from, for user feedback. */
+  zarSource: string;
+  /** True when no ZAR-equivalent column was found and Total was used as-is. */
+  zarFallback: boolean;
 }
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];

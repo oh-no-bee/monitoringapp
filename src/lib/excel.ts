@@ -122,5 +122,5 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
       };
     });
 
-  return { periods, totalRows: rows.length };
+  return { periods, totalRows: rows.length, zarSource, zarFallback };
 }

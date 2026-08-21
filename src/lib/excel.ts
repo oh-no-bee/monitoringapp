@@ -53,26 +53,35 @@ export async function parseExcel(file: File): Promise<ParsedUpload> {
 
   if (!json.length) throw new Error("Spreadsheet is empty.");
 
+  // ---- Detect the ZAR-value column ONCE for the whole sheet -----------------
+  // Any header mentioning rand / ZAR is treated as the ZAR-equivalent column,
+  // so variations like "Rand Value (ZAR)", "ZAR Equiv.", "Rand Amount" all work.
+  const headers = Array.from(new Set(json.flatMap((r) => Object.keys(r))));
+  const isZarHeader = (h: string) => {
+    const n = norm(h);
+    if (/\brand\b|\bzar\b|\(zar\)/.test(n)) return true;
+    return false;
+  };
+  const zarHeader =
+    headers.find((h) => isZarHeader(h) && /value|amount|total|equiv/.test(norm(h))) ??
+    headers.find((h) => isZarHeader(h));
+
+  const totalHeader = headers.find((h) => /^(total|amount)\b/.test(norm(h)));
+
+  // If the sheet carries no ZAR column at all, fall back to the Total column for
+  // every row (better than reporting R0.00) and tell the user.
+  const zarFallback = !zarHeader;
+  const zarSource = zarHeader ?? totalHeader ?? "Total";
+
   const rows = json
     .map((r) => {
       const d = parseDate(grab(r, "Date", "Txn Date", "Transaction Date"));
       const currency = String(grab(r, "Currency") ?? "").toUpperCase();
-      // PRIMARY source of truth for ZAR value: the "Rand Value (ZAR)" column.
-      // We deliberately ignore the foreign-currency "Total" column to avoid
-      // double-counting / inflated figures.
-      const zarEq = Number(
-        grab(
-          r,
-          "Rand Value (ZAR)", "Rand Value", "Rand Value ZAR",
-          "Total (ZAR)", "Total ZAR", "ZAR Total", "ZAR Equivalent",
-          "ZAR Amount", "Rand Equivalent", "Total Rand",
-          "Amount (ZAR)", "Amount ZAR", "ZAR",
-        ) ?? 0,
-      ) || 0;
-      // Only fall back to the generic Total column when no rand column exists
-      // AND the row is already booked in ZAR (so units match).
-      const totalRaw = Number(grab(r, "Total", "Total ", "Amount") ?? 0) || 0;
-      const total = zarEq > 0 ? zarEq : (currency === "ZAR" ? totalRaw : 0);
+      const zarEq = zarHeader ? Number(grab(r, zarHeader) ?? 0) || 0 : 0;
+      const totalRaw = Number(grab(r, totalHeader ?? "Total", "Total", "Amount") ?? 0) || 0;
+      // Prefer the ZAR column. Otherwise use Total: for ZAR rows the units already
+      // match, and when the sheet has no ZAR column at all we use Total everywhere.
+      const total = zarEq !== 0 ? zarEq : (currency === "ZAR" || zarFallback ? totalRaw : 0);
       return {
         deal_code:      String(grab(r, "Deal code", "Deal Code") ?? ""),
         txn_date:       d ? d.toISOString().slice(0, 10) : null,

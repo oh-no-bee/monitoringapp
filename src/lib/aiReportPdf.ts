@@ -31,7 +31,7 @@ export function exportAIReportPDF(payload: AIReportPayload, report: AIReportResu
     if (y + need > H - 56) { doc.addPage(); y = M; }
   };
 
-  const sectionTitle = (n: string, t: string) => {
+  const sectionTitle = (n: number | string, t: string) => {
     ensure(46);
     y += 10;
     doc.setFillColor(...NAVY);

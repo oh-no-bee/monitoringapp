@@ -14,7 +14,7 @@ export interface AIReportPayload {
     ctr: number;
     sda: number;
     topTriggers: { label: string; count: number }[];
-    topClients: { name: string; type: string; totalZAR: number; risk: string; triggers: string[] }[];
+    topClients: { name: string; type: string; typeLabel: string; totalZAR: number; risk: string; triggers: string[] }[];
   }[];
   combined: {
     clients: number;
@@ -25,7 +25,7 @@ export interface AIReportPayload {
     ctr: number;
     sda: number;
     topTriggers: { label: string; count: number }[];
-    topClients: { name: string; type: string; totalZAR: number; risk: string; months: number; triggers: string[] }[];
+    topClients: { name: string; type: string; typeLabel: string; totalZAR: number; risk: string; months: number; triggers: string[] }[];
   };
 }
 
@@ -39,15 +39,37 @@ export interface AIReportResult {
   conclusion: string;
 }
 
-const SYSTEM = `You are the Money Laundering Reporting Officer (MLRO) of a South African
-Authorised Dealer in Foreign Exchange with Limited Authority. You write formal monthly
-ongoing-monitoring compliance feedback reports for record-keeping under the FIC Act 38 of 2001,
-the firm's RMCP, and SARB Exchange Control rules (CTR R49 999.99, IFTR R19 999.99,
-SDA R1 000 000 per calendar year, FIA with SARS tax clearance).
+const SYSTEM = `You are a senior Compliance Investigator writing the monthly ongoing-monitoring
+case file for a South African Authorised Dealer in Foreign Exchange with Limited Authority (ADLA).
 
-Write in a formal, factual, audit-ready register. No bullet characters inside a field, no markdown,
-no emojis. Reference exact figures (ZAR amounts with thousands separators), client names and trigger
-names from the data provided. Never invent clients or numbers that are not in the data.`;
+HOW TO WRITE
+Write in plain, flowing English, as if walking a reader through a case scenario: what happened,
+who did it, why it matters, and what we must do about it. Full sentences and connected paragraphs.
+Never use bullet points, dashes as list markers, markdown, headings inside a field, or emojis.
+Keep it simple and readable — a competent non-specialist must understand it. Tell the story of the
+month: what the data shows, which clients stood out, how their behaviour developed, and the
+consequence for the business.
+
+ABBREVIATIONS
+Never leave a code or acronym unexplained, and prefer plain words over codes. Write out client
+categories in full using the entity's own name plus a plain description, for example
+"Local Individual", "Local Corporate", "Money Changer Personal Individual",
+"Money Changer Personal Corporate", "Foreign Individual", "Foreign Corporate",
+"Local Authorised Individual", "Local Authorised Corporate". Do not print raw codes such as
+LI, MCPI, LC, B21 on their own. Always name the actual client (entity name) when discussing behaviour.
+Spell out regulators and reports on first use and link them to their source, for example
+"the Financial Intelligence Centre (FIC)", "the Financial Intelligence Centre Act 38 of 2001 (FIC Act)",
+"a Cash Threshold Report (CTR) to the Financial Intelligence Centre under section 28 of the FIC Act",
+"an International Funds Transfer Report (IFTR) under section 31 of the FIC Act",
+"a Suspicious and Unusual Transaction Report (STR) under section 29 of the FIC Act",
+"the Single Discretionary Allowance (SDA) of R1 000 000 per calendar year administered by the
+South African Reserve Bank (SARB)", "the Foreign Investment Allowance (FIA), which requires a
+SARS tax compliance status pin", and "the firm's Risk Management and Compliance Programme (RMCP)".
+
+ACCURACY
+Use exact figures from the data with thousands separators, name real clients and real triggers only,
+and never invent a client, amount or event that is not in the data provided.`;
+
 
 const schema = {
   type: "object",
@@ -114,10 +136,16 @@ export const generateAIReport = createServerFn({ method: "POST" })
           {
             role: "user",
             content:
-              `Produce the official monthly AML/CFT ongoing-monitoring compliance feedback report ` +
-              `for record keeping. Cover each month individually and the combined view. ` +
-              `Assess every high-risk client listed, naming their triggers, amounts and the required action.\n\n` +
-              `DATA (JSON):\n${JSON.stringify(data)}`,
+              `Write the monthly ongoing-monitoring compliance case file for record keeping. ` +
+              `Tell it as a flowing case scenario written by a compliance investigator: start with the ` +
+              `overall picture for the period, then walk month by month through what changed, then ` +
+              `explain the clients that concern us by name, what their pattern looks like in practice, ` +
+              `why it is a risk to the business, and what we are required to do about it under the ` +
+              `Financial Intelligence Centre Act 38 of 2001 (FIC Act) and South African Reserve Bank (SARB) ` +
+              `Exchange Control rules. Plain flowing sentences only, no bullet points, no raw client-type codes, ` +
+              `every abbreviation written out in full on first use.\n\n` +
+              `DATA (JSON). The clientTypeLabel field is the full plain-English client category to use:\n${JSON.stringify(data)}`,
+
           },
         ],
         tools: [

@@ -44,6 +44,18 @@ function summarise(results: ClientResult[]) {
   };
 }
 
+const CLIENT_TYPE_LABELS: Record<string, string> = {
+  LI: "Local Individual",
+  LC: "Local Corporate",
+  LAI: "Local Authorised Individual",
+  LAC: "Local Authorised Corporate",
+  MCPI: "Money Changer Personal Individual",
+  MCPC: "Money Changer Personal Corporate",
+  FI: "Foreign Individual",
+  FC: "Foreign Corporate",
+};
+const typeLabel = (t: string) => CLIENT_TYPE_LABELS[(t || "").toUpperCase()] || t || "Unclassified";
+
 const rank = { Critical: 0, High: 1, Medium: 2, Low: 3 } as const;
 
 export default function AIReport({
@@ -99,6 +111,7 @@ export default function AIReport({
           .map((c) => ({
             name: c.clientName,
             type: c.clientType,
+            typeLabel: typeLabel(c.clientType),
             totalZAR: c.totalZAR,
             risk: c.riskLevel,
             triggers: c.triggers.map((t) => t.label),
@@ -113,6 +126,7 @@ export default function AIReport({
         .map((c) => ({
           name: c.clientName,
           type: c.clientType,
+          typeLabel: typeLabel(c.clientType),
           totalZAR: c.totalZAR,
           risk: c.riskLevel,
           months: monthResults.filter((m) => m.results.some((r) => r.clientName === c.clientName)).length,

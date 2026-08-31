@@ -308,6 +308,11 @@ export function Dashboard() {
           <WatchList periods={periods} onOpenTriggers={() => setTriggersOpen(true)} />
         )}
 
+        {periods.length > 0 && view === "aireport" && (
+          <AIReport periods={periods} settings={settings} customs={customs} />
+        )}
+
+
         {activePeriod && view === "dashboard" && (
           <>
             {periods.length > 0 && <RiskTrendChart periods={periods} settings={settings} customs={customs} />}

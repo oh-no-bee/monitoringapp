@@ -250,6 +250,9 @@ export function Dashboard() {
               <TabsTrigger value="watchlist" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all">
                 <Eye className="mr-2 h-4 w-4" /> Watch List
               </TabsTrigger>
+              <TabsTrigger value="aireport" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+                <Brain className="mr-2 h-4 w-4" /> AI Report
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         )}

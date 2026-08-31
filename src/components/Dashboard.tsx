@@ -12,13 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2, Eye } from "lucide-react";
+import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2, Eye, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { TriggerManager } from "@/components/TriggerManager";
 import { RiskTrendChart } from "@/components/RiskTrendChart";
 import { FlaggedClients } from "@/components/FlaggedClients";
 import { WatchList } from "@/components/WatchList";
 import { LogoManager } from "@/components/LogoManager";
+import AIReport from "@/components/AIReport";
 import type { Tables } from "@/integrations/supabase/types";
 
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -12,13 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2, Eye } from "lucide-react";
+import { Upload, FileSpreadsheet, FileDown, Settings, AlertTriangle, ShieldAlert, TrendingUp, Users, Loader2, ChevronDown, ChevronRight, Trash2, Eye, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { TriggerManager } from "@/components/TriggerManager";
 import { RiskTrendChart } from "@/components/RiskTrendChart";
 import { FlaggedClients } from "@/components/FlaggedClients";
 import { WatchList } from "@/components/WatchList";
 import { LogoManager } from "@/components/LogoManager";
+import AIReport from "@/components/AIReport";
 import type { Tables } from "@/integrations/supabase/types";
 
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,7 +42,7 @@ export function Dashboard() {
   const [dirFilter, setDirFilter] = useState("ALL");
   const [currencyFilter, setCurrencyFilter] = useState("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [view, setView] = useState<"dashboard" | "flagged" | "watchlist">("dashboard");
+  const [view, setView] = useState<"dashboard" | "flagged" | "watchlist" | "aireport">("dashboard");
   const [triggersOpen, setTriggersOpen] = useState(false);
 
   const { data: periods = [] } = useQuery({
@@ -249,6 +250,9 @@ export function Dashboard() {
               <TabsTrigger value="watchlist" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground transition-all">
                 <Eye className="mr-2 h-4 w-4" /> Watch List
               </TabsTrigger>
+              <TabsTrigger value="aireport" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+                <Brain className="mr-2 h-4 w-4" /> AI Report
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         )}
@@ -303,6 +307,11 @@ export function Dashboard() {
         {periods.length > 0 && view === "watchlist" && (
           <WatchList periods={periods} onOpenTriggers={() => setTriggersOpen(true)} />
         )}
+
+        {periods.length > 0 && view === "aireport" && (
+          <AIReport periods={periods} settings={settings} customs={customs} />
+        )}
+
 
         {activePeriod && view === "dashboard" && (
           <>

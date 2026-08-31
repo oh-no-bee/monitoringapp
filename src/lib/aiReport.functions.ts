@@ -14,7 +14,7 @@ export interface AIReportPayload {
     ctr: number;
     sda: number;
     topTriggers: { label: string; count: number }[];
-    topClients: { name: string; type: string; totalZAR: number; risk: string; triggers: string[] }[];
+    topClients: { name: string; type: string; typeLabel: string; totalZAR: number; risk: string; triggers: string[] }[];
   }[];
   combined: {
     clients: number;
@@ -25,7 +25,7 @@ export interface AIReportPayload {
     ctr: number;
     sda: number;
     topTriggers: { label: string; count: number }[];
-    topClients: { name: string; type: string; totalZAR: number; risk: string; months: number; triggers: string[] }[];
+    topClients: { name: string; type: string; typeLabel: string; totalZAR: number; risk: string; months: number; triggers: string[] }[];
   };
 }
 

@@ -136,10 +136,16 @@ export const generateAIReport = createServerFn({ method: "POST" })
           {
             role: "user",
             content:
-              `Produce the official monthly AML/CFT ongoing-monitoring compliance feedback report ` +
-              `for record keeping. Cover each month individually and the combined view. ` +
-              `Assess every high-risk client listed, naming their triggers, amounts and the required action.\n\n` +
-              `DATA (JSON):\n${JSON.stringify(data)}`,
+              `Write the monthly ongoing-monitoring compliance case file for record keeping. ` +
+              `Tell it as a flowing case scenario written by a compliance investigator: start with the ` +
+              `overall picture for the period, then walk month by month through what changed, then ` +
+              `explain the clients that concern us by name, what their pattern looks like in practice, ` +
+              `why it is a risk to the business, and what we are required to do about it under the ` +
+              `Financial Intelligence Centre Act 38 of 2001 (FIC Act) and South African Reserve Bank (SARB) ` +
+              `Exchange Control rules. Plain flowing sentences only, no bullet points, no raw client-type codes, ` +
+              `every abbreviation written out in full on first use.\n\n` +
+              `DATA (JSON). The clientTypeLabel field is the full plain-English client category to use:\n${JSON.stringify(data)}`,
+
           },
         ],
         tools: [

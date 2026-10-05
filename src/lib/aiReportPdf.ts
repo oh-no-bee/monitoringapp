@@ -152,15 +152,15 @@ export function exportAIReportPDF(payload: AIReportPayload, report: AIReportResu
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
-    head: [["Client", "Type", "Risk", "Total (ZAR)", "Triggers Breached"]],
+    head: [["Client", "Client Category", "Risk", "Total (ZAR)", "Triggers Breached"]],
     body: c.topClients.map((cl) => [
-      cl.name, cl.type, cl.risk,
+      cl.name, cl.typeLabel || cl.type, cl.risk,
       cl.totalZAR.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       cl.triggers.join("; "),
     ]),
     headStyles: { fillColor: NAVY, fontSize: 8 },
     styles: { fontSize: 7.5, cellPadding: 4, valign: "top" },
-    columnStyles: { 0: { cellWidth: 96 }, 1: { cellWidth: 34 }, 2: { cellWidth: 40 }, 3: { cellWidth: 66 }, 4: { cellWidth: "auto" } },
+    columnStyles: { 0: { cellWidth: 96 }, 1: { cellWidth: 70 }, 2: { cellWidth: 40 }, 3: { cellWidth: 66 }, 4: { cellWidth: "auto" } },
     alternateRowStyles: { fillColor: [246, 248, 251] },
   });
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
@@ -201,5 +201,17 @@ export function exportAIReportPDF(payload: AIReportPayload, report: AIReportResu
   });
 
   footer();
-  doc.save(`GFX_AI_Compliance_Report_${scopeLabel.replace(/\s+/g, "_")}.pdf`);
+  const safe = scopeLabel.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const filename = `GFX_AI_Compliance_Report_${safe || "Report"}.pdf`;
+  const blob = doc.output("blob");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return url;
 }

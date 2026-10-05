@@ -182,8 +182,16 @@ export default function AIReport({
                 disabled={!report || !payload}
                 onClick={() => {
                   if (report && payload) {
-                    exportAIReportPDF(payload, report, scopeLabel);
-                    toast.success("PDF downloaded.");
+                    try {
+                      const url = exportAIReportPDF(payload, report, scopeLabel);
+                      toast.success("PDF downloaded.", {
+                        description: "Not seeing it? Open it in a new tab instead.",
+                        action: { label: "Open PDF", onClick: () => window.open(url, "_blank") },
+                        duration: 10000,
+                      });
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "PDF export failed.");
+                    }
                   }
                 }}
               >

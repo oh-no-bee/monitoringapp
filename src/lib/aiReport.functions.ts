@@ -29,6 +29,13 @@ export interface AIReportPayload {
   };
 }
 
+export interface AIReportOptions {
+  style: "case" | "formal" | "brief";
+  length: "short" | "standard" | "detailed";
+  sections: { summary: boolean; monthly: boolean; themes: boolean; clients: boolean; obligations: boolean; recommendations: boolean };
+  focus: string;
+}
+
 export interface AIReportResult {
   executiveSummary: string;
   monthlyCommentary: { month: string; commentary: string }[];
@@ -121,8 +128,16 @@ const schema = {
 } as const;
 
 export const generateAIReport = createServerFn({ method: "POST" })
-  .inputValidator((data: AIReportPayload) => data)
-  .handler(async ({ data }): Promise<AIReportResult> => {
+  .inputValidator((input: { payload: AIReportPayload; options: AIReportOptions }) => input)
+  .handler(async ({ data: input }): Promise<AIReportResult> => {
+    const data = input.payload;
+    const o = input.options;
+    const styleText = { case: "a flowing case-scenario story by a compliance investigator", formal: "a formal, regulator-ready MLRO report", brief: "a short, direct briefing with concise sentences" }[o.style];
+    const lenText = { short: "Keep every field brief: 1 short paragraph for summaries, 2-3 sentences per item.", standard: "Use moderate length.", detailed: "Be thorough and detailed in every field." }[o.length];
+    const off = Object.entries(o.sections).filter(([, v]) => !v).map(([k]) => k);
+    const tuning = `\n\nREPORT TUNING (follow strictly): Style: ${styleText}. ${lenText}` +
+      (off.length ? ` The reader excluded these sections, return them as empty string or empty array: ${off.join(", ")}.` : "") +
+      (o.focus.trim() ? ` Analyst focus instructions: ${o.focus.trim().slice(0, 2000)}` : "");
     const apiKey = process.env["LOVABLE_API_KEY"];
     if (!apiKey) throw new Error("AI is not configured for this project.");
 
@@ -144,7 +159,7 @@ export const generateAIReport = createServerFn({ method: "POST" })
               `Financial Intelligence Centre Act 38 of 2001 (FIC Act) and South African Reserve Bank (SARB) ` +
               `Exchange Control rules. Plain flowing sentences only, no bullet points, no raw client-type codes, ` +
               `every abbreviation written out in full on first use.\n\n` +
-              `DATA (JSON). The clientTypeLabel field is the full plain-English client category to use:\n${JSON.stringify(data)}`,
+              `DATA (JSON). The clientTypeLabel field is the full plain-English client category to use:\n${JSON.stringify(data)}${tuning}`,
 
           },
         ],
@@ -155,6 +170,7 @@ export const generateAIReport = createServerFn({ method: "POST" })
           },
         ],
         tool_choice: { type: "function", function: { name: "compliance_report" } },
+        stream: true,
       }),
     });
 
@@ -162,8 +178,37 @@ export const generateAIReport = createServerFn({ method: "POST" })
     if (res.status === 402) throw new Error("AI credits exhausted — please top up your workspace.");
     if (!res.ok) throw new Error(`AI request failed (${res.status}).`);
 
-    const json = await res.json();
-    const call = json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!call) throw new Error("AI returned no report content.");
-    return JSON.parse(call) as AIReportResult;
+    if (!res.body) throw new Error("AI returned no report content.");
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "", args = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        const d = t.slice(5).trim();
+        if (d === "[DONE]") continue;
+        try {
+          const j = JSON.parse(d);
+          for (const tc of j?.choices?.[0]?.delta?.tool_calls || []) args += tc?.function?.arguments || "";
+        } catch { /* partial */ }
+      }
+    }
+    if (!args) throw new Error("AI returned no report content. Please try again.");
+    let r: Partial<AIReportResult>;
+    try { r = JSON.parse(args); } catch { throw new Error("AI report was incomplete. Please try again."); }
+    return {
+      executiveSummary: r.executiveSummary || "",
+      monthlyCommentary: r.monthlyCommentary || [],
+      riskThemes: r.riskThemes || [],
+      clientAssessments: r.clientAssessments || [],
+      regulatoryObligations: r.regulatoryObligations || [],
+      recommendations: r.recommendations || [],
+      conclusion: r.conclusion || "",
+    };
   });

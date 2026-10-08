@@ -1,18 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { runRules, type ClientResult, type TriggerSetting, type CustomTrigger } from "@/lib/rules";
-import { generateAIReport, type AIReportPayload, type AIReportResult } from "@/lib/aiReport.functions";
+import { generateAIReport, type AIReportPayload, type AIReportResult, type AIReportOptions } from "@/lib/aiReport.functions";
 import { exportAIReportPDF } from "@/lib/aiReportPdf";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Sparkles, Download, Loader2, FileText, ShieldAlert, Scale, ListChecks, Brain } from "lucide-react";
+import { Settings2, Save, Sparkles, Download, Loader2, FileText, ShieldAlert, Scale, ListChecks, Brain } from "lucide-react";
 
 const fmtZ = (n: number) => "R " + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -56,6 +56,39 @@ const CLIENT_TYPE_LABELS: Record<string, string> = {
 };
 const typeLabel = (t: string) => CLIENT_TYPE_LABELS[(t || "").toUpperCase()] || t || "Unclassified";
 
+type Tune = AIReportOptions & {
+  periodIds: string[]; // empty = all
+  riskLevels: string[];
+  clientTypes: string[]; // empty = all
+  triggers: string[]; // empty = all
+  maxClients: number;
+};
+const DEFAULT_TUNE: Tune = {
+  style: "case",
+  length: "standard",
+  sections: { summary: true, monthly: true, themes: true, clients: true, obligations: true, recommendations: true },
+  focus: "",
+  periodIds: [],
+  riskLevels: ["Critical", "High"],
+  clientTypes: [],
+  triggers: [],
+  maxClients: 25,
+};
+const SECTION_LABELS: Record<keyof Tune["sections"], string> = {
+  summary: "Executive summary", monthly: "Monthly commentary", themes: "Risk themes",
+  clients: "Client register", obligations: "Regulatory obligations", recommendations: "Recommendations",
+};
+
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"}`}>
+      {children}
+    </button>
+  );
+}
+const toggle = (arr: string[], v: string) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+
 const rank = { Critical: 0, High: 1, Medium: 2, Low: 3 } as const;
 
 export default function AIReport({
@@ -71,6 +104,22 @@ export default function AIReport({
   const [payload, setPayload] = useState<AIReportPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const run = useServerFn(generateAIReport);
+  const [tune, setTune] = useState<Tune>(DEFAULT_TUNE);
+  const [showTune, setShowTune] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.from("report_settings").select("config").eq("id", "default").maybeSingle().then(({ data }) => {
+      if (data?.config) setTune({ ...DEFAULT_TUNE, ...(data.config as Partial<Tune>), sections: { ...DEFAULT_TUNE.sections, ...((data.config as Partial<Tune>).sections || {}) } });
+    });
+  }, []);
+
+  const saveTune = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("report_settings").upsert({ id: "default", config: tune as never, updated_at: new Date().toISOString() });
+    setSaving(false);
+    if (error) toast.error(error.message); else toast.success("Report preferences saved for all devices.");
+  };
 
   const { data: allTxns = [], isFetching } = useQuery({
     queryKey: ["all-txns-report"],
@@ -89,13 +138,27 @@ export default function AIReport({
     },
   });
 
+  const scopedTxns = allTxns.filter(
+    (t) => (!tune.periodIds.length || tune.periodIds.includes(t.period_id)) &&
+      (!tune.clientTypes.length || tune.clientTypes.includes(String((t as Record<string, unknown>).client_type || "").toUpperCase())),
+  );
+  const allTypes = [...new Set(allTxns.map((t) => String((t as Record<string, unknown>).client_type || "").toUpperCase()).filter(Boolean))].sort();
+  const allTriggerLabels = [
+    ...settings.filter((x) => (x as { enabled?: boolean }).enabled !== false).map((x) => (x as { label?: string }).label || ""),
+    ...customs.map((x) => (x as { label?: string; name?: string }).label || (x as { name?: string }).name || ""),
+  ].filter(Boolean);
+  const keepClient = (c: ClientResult) =>
+    tune.riskLevels.includes(c.riskLevel) && (!tune.triggers.length || c.triggers.some((t) => tune.triggers.includes(t.label)));
+  const tc = (c: ClientResult) => (tune.triggers.length ? c.triggers.filter((t) => tune.triggers.includes(t.label)) : c.triggers);
+
   const byPeriod = periods
-    .map((p) => ({ period: p, rows: allTxns.filter((t) => t.period_id === p.id) }))
+    .filter((p) => !tune.periodIds.length || tune.periodIds.includes(p.id))
+    .map((p) => ({ period: p, rows: scopedTxns.filter((t) => t.period_id === p.id) }))
     .filter((x) => x.rows.length > 0)
     .reverse();
 
   const monthResults = byPeriod.map((x) => ({ label: x.period.period_label, results: runRules(x.rows, settings, customs) }));
-  const combinedResults = allTxns.length ? runRules(allTxns, settings, customs) : [];
+  const combinedResults = scopedTxns.length ? runRules(scopedTxns, settings, customs) : [];
   const combinedSummary = summarise(combinedResults);
 
   const buildPayload = (): AIReportPayload => ({
@@ -105,24 +168,24 @@ export default function AIReport({
       return {
         label: m.label,
         ...s,
-        topClients: [...m.results]
+        topClients: m.results.filter(keepClient)
           .sort((a, b) => rank[a.riskLevel] - rank[b.riskLevel] || b.totalZAR - a.totalZAR)
-          .slice(0, 15)
+          .slice(0, Math.min(15, tune.maxClients))
           .map((c) => ({
             name: c.clientName,
             type: c.clientType,
             typeLabel: typeLabel(c.clientType),
             totalZAR: c.totalZAR,
             risk: c.riskLevel,
-            triggers: c.triggers.map((t) => t.label),
+            triggers: tc(c).map((t) => t.label),
           })),
       };
     }),
     combined: {
       ...combinedSummary,
-      topClients: [...combinedResults]
+      topClients: combinedResults.filter(keepClient)
         .sort((a, b) => rank[a.riskLevel] - rank[b.riskLevel] || b.totalZAR - a.totalZAR)
-        .slice(0, 25)
+        .slice(0, tune.maxClients)
         .map((c) => ({
           name: c.clientName,
           type: c.clientType,
@@ -130,7 +193,7 @@ export default function AIReport({
           totalZAR: c.totalZAR,
           risk: c.riskLevel,
           months: monthResults.filter((m) => m.results.some((r) => r.clientName === c.clientName)).length,
-          triggers: c.triggers.map((t) => t.label),
+          triggers: tc(c).map((t) => t.label),
         })),
     },
   });
@@ -140,7 +203,8 @@ export default function AIReport({
     setBusy(true);
     const p = buildPayload();
     try {
-      const res = await run({ data: p });
+      const { style, length, sections, focus } = tune;
+      const res = await run({ data: { payload: p, options: { style, length, sections, focus } } });
       setPayload(p);
       setReport(res);
       toast.success("Official AI compliance report generated.");
@@ -173,6 +237,9 @@ export default function AIReport({
               <p className="text-xs text-muted-foreground">Scope: {scopeLabel}</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setShowTune((v) => !v)}>
+                <Settings2 className="mr-2 h-4 w-4" /> Fine-tune
+              </Button>
               <Button onClick={generate} disabled={busy || isFetching}>
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                 {report ? "Regenerate" : "Generate Report"}
@@ -199,6 +266,51 @@ export default function AIReport({
               </Button>
             </div>
           </div>
+
+          <AnimatePresence>
+            {showTune && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                className="relative mt-5 space-y-4 overflow-hidden rounded-lg border bg-card p-4">
+                <TuneRow label="Months to read (none selected = all)">
+                  {periods.map((p) => <Chip key={p.id} on={tune.periodIds.includes(p.id)} onClick={() => setTune({ ...tune, periodIds: toggle(tune.periodIds, p.id) })}>{p.period_label}</Chip>)}
+                </TuneRow>
+                <TuneRow label="Risk levels to include">
+                  {["Critical", "High", "Medium", "Low"].map((r) => <Chip key={r} on={tune.riskLevels.includes(r)} onClick={() => setTune({ ...tune, riskLevels: toggle(tune.riskLevels, r) })}>{r}</Chip>)}
+                </TuneRow>
+                <TuneRow label="Client types (none selected = all)">
+                  {allTypes.map((t) => <Chip key={t} on={tune.clientTypes.includes(t)} onClick={() => setTune({ ...tune, clientTypes: toggle(tune.clientTypes, t) })}>{typeLabel(t)}</Chip>)}
+                </TuneRow>
+                <TuneRow label="Only clients hitting these triggers (none selected = any)">
+                  {allTriggerLabels.map((t) => <Chip key={t} on={tune.triggers.includes(t)} onClick={() => setTune({ ...tune, triggers: toggle(tune.triggers, t) })}>{t}</Chip>)}
+                </TuneRow>
+                <TuneRow label="Sections to show">
+                  {(Object.keys(SECTION_LABELS) as (keyof Tune["sections"])[]).map((k) => (
+                    <Chip key={k} on={tune.sections[k]} onClick={() => setTune({ ...tune, sections: { ...tune.sections, [k]: !tune.sections[k] } })}>{SECTION_LABELS[k]}</Chip>
+                  ))}
+                </TuneRow>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <TuneRow label="Writing style">
+                    {([["case", "Case story"], ["formal", "Formal"], ["brief", "Brief"]] as const).map(([v, l]) => <Chip key={v} on={tune.style === v} onClick={() => setTune({ ...tune, style: v })}>{l}</Chip>)}
+                  </TuneRow>
+                  <TuneRow label="Length">
+                    {([["short", "Short"], ["standard", "Standard"], ["detailed", "Detailed"]] as const).map(([v, l]) => <Chip key={v} on={tune.length === v} onClick={() => setTune({ ...tune, length: v })}>{l}</Chip>)}
+                  </TuneRow>
+                  <TuneRow label={`Max clients in register: ${tune.maxClients}`}>
+                    <input type="range" min={5} max={50} step={5} value={tune.maxClients} onChange={(e) => setTune({ ...tune, maxClients: Number(e.target.value) })} className="w-full accent-[var(--primary)]" />
+                  </TuneRow>
+                </div>
+                <TuneRow label="Extra instructions for the AI (optional)">
+                  <textarea value={tune.focus} onChange={(e) => setTune({ ...tune, focus: e.target.value })} rows={3}
+                    placeholder="e.g. Focus on cash structuring and Reserve Bank allowance breaches; mention repeat offenders across months."
+                    className="w-full rounded-md border bg-background p-2 text-sm" />
+                </TuneRow>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setTune(DEFAULT_TUNE)}>Reset</Button>
+                  <Button variant="secondary" onClick={saveTune} disabled={saving}><Save className="mr-2 h-4 w-4" />Save preferences</Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 md:grid-cols-6">
             {[
@@ -236,13 +348,15 @@ export default function AIReport({
       <AnimatePresence>
         {report && !busy && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <Section icon={FileText} title="Executive Summary">
+            {tune.sections.summary && (
+<Section icon={FileText} title="Executive Summary">
               {report.executiveSummary.split(/\n{2,}/).map((p, i) => (
                 <p key={i} className="text-sm leading-relaxed text-foreground/90">{p.trim()}</p>
               ))}
-            </Section>
+            </Section>)}
 
-            <Section icon={ListChecks} title="Monthly Risk Position">
+            {tune.sections.monthly && (
+<Section icon={ListChecks} title="Monthly Risk Position">
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-sm">
                   <thead className="bg-secondary/50 text-left text-xs uppercase tracking-wider">
@@ -277,9 +391,10 @@ export default function AIReport({
                   </div>
                 ))}
               </div>
-            </Section>
+            </Section>)}
 
-            <Section icon={Scale} title="Risk Themes Identified">
+            {tune.sections.themes && (
+<Section icon={Scale} title="Risk Themes Identified">
               <div className="grid gap-3 md:grid-cols-2">
                 {report.riskThemes.map((t, i) => (
                   <motion.div key={i} whileHover={{ y: -2 }} className="rounded-lg border bg-card p-4">
@@ -288,9 +403,10 @@ export default function AIReport({
                   </motion.div>
                 ))}
               </div>
-            </Section>
+            </Section>)}
 
-            <Section icon={ShieldAlert} title="High-Risk Client Register">
+            {tune.sections.clients && (
+<Section icon={ShieldAlert} title="High-Risk Client Register">
               <div className="space-y-3">
                 {report.clientAssessments.map((c, i) => (
                   <motion.div
@@ -326,23 +442,25 @@ export default function AIReport({
                   </motion.div>
                 ))}
               </div>
-            </Section>
+            </Section>)}
 
             <div className="grid gap-6 md:grid-cols-2">
-              <Section icon={Scale} title="Regulatory Obligations">
+              {tune.sections.obligations && (
+<Section icon={Scale} title="Regulatory Obligations">
                 <ul className="space-y-2">
                   {report.regulatoryObligations.map((o, i) => (
                     <li key={i} className="flex gap-2 text-sm"><span className="text-accent">▪</span>{o}</li>
                   ))}
                 </ul>
-              </Section>
-              <Section icon={ListChecks} title="Recommendations">
+              </Section>)}
+              {tune.sections.recommendations && (
+<Section icon={ListChecks} title="Recommendations">
                 <ul className="space-y-2">
                   {report.recommendations.map((o, i) => (
                     <li key={i} className="flex gap-2 text-sm"><span className="text-primary">▪</span>{o}</li>
                   ))}
                 </ul>
-              </Section>
+              </Section>)}
             </div>
 
             <Section icon={FileText} title="Conclusion & Sign-off">
@@ -380,5 +498,14 @@ function Section({
       </div>
       {children}
     </Card>
+  );
+}
+
+function TuneRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
   );
 }

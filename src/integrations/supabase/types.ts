@@ -103,6 +103,24 @@ export type Database = {
         }
         Relationships: []
       }
+      report_settings: {
+        Row: {
+          config: Json
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           client_name: string | null
